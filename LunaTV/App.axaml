@@ -26,6 +26,5 @@
         <semi:SemiPopupAnimations />
         <semi:DataGridSemiTheme />
         <u-semi:SemiTheme Locale="zh-CN" />
-        <StyleInclude Source="avares://NodifyM.Avalonia/Styles/ControlStyles.axaml" />
     </Application.Styles>
 </Application>

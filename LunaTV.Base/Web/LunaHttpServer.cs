@@ -50,14 +50,17 @@ public class LunaHttpStaticPageServer
             .ConfigurePlugins(a =>
             {
                 a.UseTcpSessionCheckClear();
-                a.UseHttpStaticPage() //添加静态页面文件夹
-                    .SetNavigateAction(request =>
-                    {
-                        if (request.RelativeURL.EndsWith("/")) return $"{request.RelativeURL}/index.html";
+                a.UseHttpStaticPage( //添加静态页面文件夹
+                        options =>
+                        {
+                            options.SetNavigateAction(request =>
+                            {
+                                if (request.RelativeURL.EndsWith("/")) return $"{request.RelativeURL}/index.html";
 
-                        //此处可以设置重定向
-                        return request.RelativeURL;
-                    })
+                                //此处可以设置重定向
+                                return request.RelativeURL;
+                            });
+                        })
                     .AddFolder(staticFolder);
 
                 //此插件是http的兜底插件，应该最后添加。作用是当所有路由不匹配时返回404.且内部也会处理Option请求。可以更好的处理来自浏览器的跨域探测。

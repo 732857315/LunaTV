@@ -129,10 +129,6 @@ public partial class TVShowViewModel : PageViewModelBase
                 {
                     DataContext = new TVShowSettingViewModel()
                 },
-                "下载" => new TVDownloadView()
-                {
-                    DataContext = new TVDownloadViewModel()
-                },
                 _ => null
             };
     }
