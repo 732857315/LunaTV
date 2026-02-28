@@ -229,9 +229,8 @@ public partial class MpvContext
             CaptureSize = captureSize,
             CaptureStdOut = captureStdOut,
             CaptureStdErr = captureStdErr,
-        }
-        ;
-        data.Args.Add(command.CheckNotNullOrEmpty(nameof(command)));
+        };
+        data.Args.Add(Check.NotNullOrEmpty(command));
         if (args?.Any() == true)
         {
             foreach (var item in args)

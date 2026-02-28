@@ -71,7 +71,7 @@ public class MpvOptionList : MpvOptionRef<IEnumerable<string>>
     public void Add(string value, MpvAsyncOptions? options = null)
     {
         Mpv.ChangeList(PropertyName,
-            ListOptionOperation.Append, value.CheckNotNullOrEmpty(nameof(value))).Invoke(options.ToCommandOptions());
+            ListOptionOperation.Append, Check.NotNullOrEmpty(value)).Invoke(options.ToCommandOptions());
     }
 
     /// <summary>
@@ -80,7 +80,7 @@ public class MpvOptionList : MpvOptionRef<IEnumerable<string>>
     public Task AddAsync(string value, MpvAsyncOptions? options = null)
     {
         return Mpv.ChangeList(PropertyName,
-                ListOptionOperation.Append, value.CheckNotNullOrEmpty(nameof(value)))
+                ListOptionOperation.Append, Check.NotNullOrEmpty(value))
             .InvokeAsync(options.ToCommandOptions());
     }
 
@@ -131,7 +131,7 @@ public class MpvOptionList : MpvOptionRef<IEnumerable<string>>
     public void Remove(string value, MpvAsyncOptions? options = null)
     {
         Mpv.ChangeList(PropertyName,
-            ListOptionOperation.Remove, value.CheckNotNullOrEmpty(nameof(value))).Invoke(options.ToCommandOptions());
+            ListOptionOperation.Remove, Check.NotNullOrEmpty(value)).Invoke(options.ToCommandOptions());
     }
 
     /// <summary>
@@ -140,7 +140,7 @@ public class MpvOptionList : MpvOptionRef<IEnumerable<string>>
     public Task RemoveAsync(string value, MpvAsyncOptions? options = null)
     {
         return Mpv.ChangeList(PropertyName,
-                ListOptionOperation.Remove, value.CheckNotNullOrEmpty(nameof(value)))
+                ListOptionOperation.Remove, Check.NotNullOrEmpty(value))
             .InvokeAsync(options.ToCommandOptions());
     }
 

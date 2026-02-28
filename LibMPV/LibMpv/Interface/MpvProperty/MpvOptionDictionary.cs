@@ -82,7 +82,7 @@ public class MpvOptionDictionary : MpvOptionRef<IDictionary<string, string>>
     public void Add(string key, string value, MpvAsyncOptions? options = null)
     {
         Mpv.ChangeList(PropertyName, ListOptionOperation.Add,
-            FormatKeyValue(key.CheckNotNullOrEmpty(nameof(key)), value)).Invoke(options.ToCommandOptions());
+            FormatKeyValue(Check.NotNullOrEmpty(key), value)).Invoke(options.ToCommandOptions());
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public class MpvOptionDictionary : MpvOptionRef<IDictionary<string, string>>
     public Task AddAsync(string key, string value, MpvAsyncOptions? options = null)
     {
         return Mpv.ChangeList(PropertyName, ListOptionOperation.Add,
-            FormatKeyValue(key.CheckNotNullOrEmpty(nameof(key)), value)).InvokeAsync(options.ToCommandOptions());
+            FormatKeyValue(Check.NotNullOrEmpty(key), value)).InvokeAsync(options.ToCommandOptions());
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public class MpvOptionDictionary : MpvOptionRef<IDictionary<string, string>>
     public void Remove(string key, MpvAsyncOptions? options = null)
     {
         Mpv.ChangeList(PropertyName, ListOptionOperation.Remove,
-            key.CheckNotNullOrEmpty(nameof(key))).Invoke(options.ToCommandOptions());
+            Check.NotNullOrEmpty(key)).Invoke(options.ToCommandOptions());
     }
 
     /// <summary>
@@ -118,6 +118,6 @@ public class MpvOptionDictionary : MpvOptionRef<IDictionary<string, string>>
     public Task RemoveAsync(string key, MpvAsyncOptions? options = null)
     {
         return Mpv.ChangeList(PropertyName, ListOptionOperation.Remove,
-            key.CheckNotNullOrEmpty(nameof(key))).InvokeAsync(options.ToCommandOptions());
+            Check.NotNullOrEmpty(key)).InvokeAsync(options.ToCommandOptions());
     }
 }
