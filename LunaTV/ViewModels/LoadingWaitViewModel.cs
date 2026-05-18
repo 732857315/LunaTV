@@ -1,23 +1,24 @@
-﻿using System;
-using Avalonia.Threading;
+﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Irihi.Avalonia.Shared.Contracts;
 using LunaTV.ViewModels.Base;
+using System;
 
 namespace LunaTV.ViewModels;
 
 public partial class LoadingWaitViewModel : ViewModelBase, IDialogContext
 {
+    [ObservableProperty] private string _loadingGifPath = "avares://LunaTV/Assets/images/shalou.gif";
     [ObservableProperty] private string _loadingTime = "00:00:00";
-
-    private DispatcherTimer _timer;
     private int _loadingTimeSeconds;
+
+    private readonly DispatcherTimer _timer;
 
     public LoadingWaitViewModel()
     {
         _timer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(1),
+            Interval = TimeSpan.FromSeconds(1)
         };
         _timer.Tick += (_, _) =>
         {
@@ -25,6 +26,14 @@ public partial class LoadingWaitViewModel : ViewModelBase, IDialogContext
             LoadingTime = TimeSpan.FromSeconds(_loadingTimeSeconds).ToString(@"hh\:mm\:ss");
         };
     }
+
+    public void Close()
+    {
+        RequestClose?.Invoke(this, null);
+        TimerStop();
+    }
+
+    public event EventHandler<object?>? RequestClose;
 
     public void TimerStart()
     {
@@ -36,12 +45,4 @@ public partial class LoadingWaitViewModel : ViewModelBase, IDialogContext
         _timer.Stop();
         _loadingTimeSeconds = 0;
     }
-
-    public void Close()
-    {
-        RequestClose?.Invoke(this, null);
-        TimerStop();
-    }
-
-    public event EventHandler<object?>? RequestClose;
 }

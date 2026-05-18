@@ -2,8 +2,8 @@
     x:Class="LunaTV.App"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mic="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     xmlns:semi="https://irihi.tech/semi"
-    xmlns:styling="clr-namespace:FluentAvalonia.Styling;assembly=FluentAvalonia"
     xmlns:u-semi="https://irihi.tech/ursa/themes/semi"
     RequestedThemeVariant="Default">
     <!--  "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options.  -->
@@ -14,6 +14,7 @@
                 <ResourceInclude Source="/Styles/IconPath.axaml" />
                 <ResourceInclude Source="/Styles/Theme.axaml" />
                 <ResourceInclude Source="/Styles/MpvTheme.axaml" />
+                <ResourceInclude Source="/Styles/OptionsDisplayItem.axaml" />
             </ResourceDictionary.MergedDictionaries>
 
         </ResourceDictionary>
@@ -21,10 +22,10 @@
 
     <Application.Styles>
         <StyleInclude Source="/Styles/Style.axaml" />
-        <styling:FluentAvaloniaTheme UseSystemFontOnWindows="True" />
         <semi:SemiTheme Locale="zh-CN" />
         <semi:SemiPopupAnimations />
         <semi:DataGridSemiTheme />
         <u-semi:SemiTheme Locale="zh-CN" />
+        <mic:MaterialIconStyles />
     </Application.Styles>
 </Application>

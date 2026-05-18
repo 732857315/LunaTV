@@ -26,15 +26,6 @@ public static class ServiceCollectionExtenstion
     /// <param name="serviceCollection"></param>
     public static void AddServices(this IServiceCollection serviceCollection)
     {
-        // 主窗口
-        serviceCollection.AddSingleton<MainWindow>();
-        serviceCollection.AddSingleton<MainView>();
-        serviceCollection.AddSingleton<Lazy<MainWindow>>(provider =>
-            new Lazy<MainWindow>(provider.GetRequiredService<MainWindow>));
-        serviceCollection.AddSingleton<Lazy<MainView>>(provider =>
-            new Lazy<MainView>(provider.GetRequiredService<MainView>));
-        serviceCollection.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
-
         // 影视资源查找
         serviceCollection.AddScoped<MovieTvService>();
 
@@ -119,21 +110,8 @@ public static class ServiceCollectionExtenstion
     public static void AddViewModels(this IServiceCollection serviceCollection)
     {
         // page view model
-        serviceCollection.AddTransient<TVShowViewModel>();
         serviceCollection.AddTransient<SettingsViewModel>();
-        serviceCollection.AddSingleton<MainViewModel>(provider =>
-            new MainViewModel
-            {
-                Pages =
-                {
-                    provider.GetRequiredService<TVShowViewModel>(),
-                },
-                FooterPages =
-                {
-                    provider.GetRequiredService<SettingsViewModel>()
-                }
-            }
-        );
+        serviceCollection.AddSingleton<MainViewModel>();
     }
 
     /// <summary>
@@ -142,8 +120,10 @@ public static class ServiceCollectionExtenstion
     /// <param name="serviceCollection"></param>
     public static void AddViews(this IServiceCollection serviceCollection)
     {
-        serviceCollection.AddTransient<TVShowView>();
-        serviceCollection.AddSingleton<SettingsView>();
+        // 主窗口
+        serviceCollection.AddSingleton<MainWindow>();
+        serviceCollection.AddSingleton<MainView>();
+        serviceCollection.AddTransient<SettingsView>();
     }
 
     /// <summary>

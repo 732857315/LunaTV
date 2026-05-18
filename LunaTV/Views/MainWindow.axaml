@@ -43,7 +43,7 @@
     </u:UrsaWindow.LeftContent>
     <u:UrsaWindow.Styles>
         <!--  This style is created to demonstrate Dialog StyleClass feature. This style is applied to dialogs in MainWindow OverlayDialogHost  -->
-        <Style Selector="u|DefaultDialogControl.Custom">
+        <Style Selector="u|StandardDialogWindow.Custom">
             <Style Selector="^ /template/ Button#PART_OKButton">
                 <Setter Property="Content" Value="CUSTOM" />
                 <Setter Property="iri:ClassHelper.Classes" Value="Warning" />

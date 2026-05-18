@@ -1,4 +1,5 @@
 ﻿using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
@@ -8,22 +9,26 @@ namespace HanumanInstitute.LibMpv.Avalonia;
 
 public class OpenGlView : OpenGlControlBase, IVideoView
 {
-    delegate IntPtr GetProcAddress(string proc);
-
-    private GetProcAddress? _getProcAddress;
-
     // MpvContext property
     public static readonly DirectProperty<OpenGlView, MpvContext> MpvContextProperty =
         AvaloniaProperty.RegisterDirect<OpenGlView, MpvContext>(
             nameof(MpvContext), o => o.MpvContext, defaultBindingMode: BindingMode.OneWayToSource);
 
+    private GetProcAddress? _getProcAddress;
+
     public MpvContext MpvContext { get; } = new();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 
     protected override void OnOpenGlRender(GlInterface gl, int fbo)
     {
         if (MpvContext != null && MpvContext.IsCustomRendering())
         {
-            var size = GetPixelSize();
+            PixelSize size = GetPixelSize();
             MpvContext.OpenGlRender(size.Width, size.Height, fbo, 1);
         }
     }
@@ -38,7 +43,7 @@ public class OpenGlView : OpenGlControlBase, IVideoView
 
         _getProcAddress = gl.GetProcAddress;
         MpvContext?.StopRendering();
-        MpvContext?.StartOpenGlRendering((name) => _getProcAddress(name), this.UpdateVideoView);
+        MpvContext?.StartOpenGlRendering(name => _getProcAddress(name), UpdateVideoView);
     }
 
     protected override void OnOpenGlDeinit(GlInterface gl)
@@ -49,13 +54,13 @@ public class OpenGlView : OpenGlControlBase, IVideoView
 
     private PixelSize GetPixelSize()
     {
-        var scaling = VisualRoot!.RenderScaling;
+        double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
         return new PixelSize(Math.Max(1, (int)(Bounds.Width * scaling)), Math.Max(1, (int)(Bounds.Height * scaling)));
     }
 
     private void UpdateVideoView()
     {
-        Dispatcher.UIThread.InvokeAsync(this.RequestNextFrameRendering, DispatcherPriority.Background);
+        Dispatcher.UIThread.InvokeAsync(RequestNextFrameRendering, DispatcherPriority.Background);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -66,9 +71,5 @@ public class OpenGlView : OpenGlControlBase, IVideoView
         }
     }
 
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
+    private delegate IntPtr GetProcAddress(string proc);
 }

@@ -3,51 +3,65 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:fa="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mic="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     xmlns:mpv="clr-namespace:HanumanInstitute.LibMpv.Avalonia;assembly=Luna.LibMpv.Avalonia"
     xmlns:tvShowPages="clr-namespace:LunaTV.ViewModels.TVShowPages"
     xmlns:u="https://irihi.tech/ursa"
-    xmlns:vm="using:LunaTV.ViewModels"
     xmlns:utils="using:LunaTV.Utils"
+    xmlns:vm="using:LunaTV.ViewModels"
     Title="LunaTV"
     d:DesignHeight="450"
     d:DesignWidth="1000"
     x:DataType="vm:MpvPlayerWindowModel"
     Icon="/Assets/logo-tv.png"
     IsFullScreenButtonVisible="True"
-    WindowStartupLocation="CenterScreen"
-    WindowState="Maximized"
     PointerEntered="OnPointerEntered"
     PointerMoved="OnPointerMoved"
+    WindowStartupLocation="CenterScreen"
+    WindowState="Maximized"
     mc:Ignorable="d">
     <Window.KeyBindings>
-        <KeyBinding Gesture="Space" Command="{Binding  PlayPause}" />
-        <KeyBinding Gesture="Right" Command="{Binding Seek}" CommandParameter="{utils:Int32 1}" />
-        <KeyBinding Gesture="Ctrl+Right" Command="{Binding Seek}"
-                    CommandParameter="{utils:Int32 10}" />
-        <KeyBinding Gesture="Left" Command="{Binding Seek}" CommandParameter="{utils:Int32 -1}" />
-        <KeyBinding Gesture="Ctrl+Left" Command="{Binding Seek}"
-                    CommandParameter="{utils:Int32 -10}" />
-        <KeyBinding Gesture="Up" Command="{Binding ChangeVolume}"
-                    CommandParameter="{utils:Int32 5}" />
-        <KeyBinding Gesture="Down" Command="{Binding ChangeVolume}"
-                    CommandParameter="{utils:Int32 -5}" />
+        <KeyBinding Command="{Binding PlayPause}" Gesture="Space" />
+        <KeyBinding
+            Command="{Binding Seek}"
+            CommandParameter="{utils:Int32 1}"
+            Gesture="Right" />
+        <KeyBinding
+            Command="{Binding Seek}"
+            CommandParameter="{utils:Int32 10}"
+            Gesture="Ctrl+Right" />
+        <KeyBinding
+            Command="{Binding Seek}"
+            CommandParameter="{utils:Int32 -1}"
+            Gesture="Left" />
+        <KeyBinding
+            Command="{Binding Seek}"
+            CommandParameter="{utils:Int32 -10}"
+            Gesture="Ctrl+Left" />
+        <KeyBinding
+            Command="{Binding ChangeVolume}"
+            CommandParameter="{utils:Int32 5}"
+            Gesture="Up" />
+        <KeyBinding
+            Command="{Binding ChangeVolume}"
+            CommandParameter="{utils:Int32 -5}"
+            Gesture="Down" />
     </Window.KeyBindings>
 
     <Window.Styles>
-        <Style Selector="fa|SymbolIcon.PlayIcon">
-            <Setter Property="Symbol" Value="PlayFilled" />
+        <Style Selector="mic|MaterialIcon.PlayIcon">
+            <Setter Property="Kind" Value="Play" />
         </Style>
-        <Style Selector="fa|SymbolIcon.PauseIcon">
-            <Setter Property="Symbol" Value="PauseFilled" />
+        <Style Selector="mic|MaterialIcon.PauseIcon">
+            <Setter Property="Kind" Value="Pause" />
         </Style>
 
-        <Style Selector="fa|SymbolIcon.MuteIcon">
-            <Setter Property="Symbol" Value="Speaker2Filled" />
+        <Style Selector="mic|MaterialIcon.MuteIcon">
+            <Setter Property="Kind" Value="Speaker" />
         </Style>
-        <Style Selector="fa|SymbolIcon.UnmuteIcon">
-            <Setter Property="Symbol" Value="SpeakerOffFilled" />
+        <Style Selector="mic|MaterialIcon.UnmuteIcon">
+            <Setter Property="Kind" Value="SpeakerOff" />
         </Style>
 
         <Style Selector="Button.TransparentButton:pointerover">
@@ -102,12 +116,10 @@
                                 Orientation="Horizontal"
                                 Spacing="4">
                                 <!--  Current Position Display  -->
-                                <TextBlock VerticalAlignment="Center"
-                                           Text="{Binding Position, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" />
+                                <TextBlock VerticalAlignment="Center" Text="{Binding Position, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" />
                                 <TextBlock VerticalAlignment="Center" Text="/" />
                                 <!--  Maximum Duration Display  -->
-                                <TextBlock VerticalAlignment="Center"
-                                           Text="{Binding Duration, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" />
+                                <TextBlock VerticalAlignment="Center" Text="{Binding Duration, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" />
                             </StackPanel>
                             <StackPanel
                                 Grid.Column="1"
@@ -117,19 +129,19 @@
                                     Command="{Binding Stop}"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="结束">
-                                    <fa:SymbolIcon FontSize="18" Symbol="StopFilled" />
+                                    <mic:MaterialIcon FontSize="18" Kind="Stop" />
                                 </Button>
                                 <Button
                                     Command="{Binding GoHeadCommand}"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="移到开头">
-                                    <fa:SymbolIcon FontSize="18" Symbol="PreviousFilled" />
+                                    <mic:MaterialIcon FontSize="18" Kind="SkipPrevious" />
                                 </Button>
                                 <Button
                                     Command="{Binding PlayPause}"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="播放/暂停">
-                                    <fa:SymbolIcon
+                                    <mic:MaterialIcon
                                         Classes.PauseIcon="{Binding IsPlaying}"
                                         Classes.PlayIcon="{Binding !IsPlaying}"
                                         FontSize="32" />
@@ -138,7 +150,7 @@
                                     Command="{Binding GoTailCommand}"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="移到结尾">
-                                    <fa:SymbolIcon FontSize="18" Symbol="NextFilled" />
+                                    <mic:MaterialIcon FontSize="18" Kind="SkipNext" />
                                 </Button>
                             </StackPanel>
 
@@ -152,14 +164,14 @@
                                     Command="{Binding ScreenshotCommand}"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="截屏">
-                                    <fa:SymbolIcon FontSize="18" Symbol="Camera" />
+                                    <mic:MaterialIcon FontSize="18" Kind="Camera" />
                                 </Button>
                                 <Button
                                     Margin="10,0"
                                     Padding="2"
                                     Background="Transparent"
                                     Command="{Binding MuteCommand}">
-                                    <fa:SymbolIcon
+                                    <mic:MaterialIcon
                                         Classes.MuteIcon="{Binding !IsMuted}"
                                         Classes.UnmuteIcon="{Binding IsMuted}"
                                         FontSize="18" />
@@ -208,8 +220,7 @@
                 </Border>
             </Panel>
 
-            <Border Grid.Column="1"
-                    Width="{Binding KanBanWidth}">
+            <Border Grid.Column="1" Width="{Binding KanBanWidth}">
                 <Grid RowDefinitions="Auto,*">
                     <TextBlock
                         HorizontalAlignment="Left"

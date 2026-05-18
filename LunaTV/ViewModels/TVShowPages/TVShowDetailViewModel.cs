@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
-using Avalonia.Controls.Notifications;
+﻿using Avalonia.Controls.Notifications;
+using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Irihi.Avalonia.Shared.Contracts;
@@ -14,6 +10,11 @@ using LunaTV.Models;
 using LunaTV.ViewModels.Base;
 using LunaTV.Views;
 using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using Notification = Ursa.Controls.Notification;
 
 namespace LunaTV.ViewModels.TVShowPages;
@@ -27,13 +28,13 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         _viewHistoryTable = App.Services.GetRequiredService<SugarRepository<ViewHistory>>();
     }
 
-    public string? VideoName { set; get; }
-    public string? SourceName { set; get; }
+    public string? VideoName { get; set; }
+    public string? SourceName { get; set; }
     public string SourceNameText => $"({AppConifg.ApiSitesConfig[SourceName].Name})";
-    public DetailResult VideoDetail { set; get; }
-    public List<EpisodeSubjectItem> Episodes { set; get; } = new();
-    public bool IsVideoBorderVisible { set; get; }
-    public string EpisodesCountText { set; get; }
+    public DetailResult VideoDetail { get; set; }
+    public List<EpisodeSubjectItem> Episodes { get; set; } = new();
+    public bool IsVideoBorderVisible { get; set; }
+    public string EpisodesCountText { get; set; }
 
     public void Close()
     {
@@ -51,10 +52,12 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
             Url = ep.Url
         }).ToList();
         EpisodesCountText = $"共{Episodes.Count}集";
-        var viewHistory = _viewHistoryTable.GetSingle(his =>
+        ViewHistory? viewHistory = _viewHistoryTable.GetSingle(his =>
             his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
         if (viewHistory is not null)
+        {
             Episodes[Episodes.IndexOf(Episodes.FirstOrDefault(ep => ep.Name == viewHistory.Episode))].Watched = true;
+        }
     }
 
     [RelayCommand]
@@ -73,9 +76,10 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
             videoModel.Title = $"{VideoName} {episodeSubject.Name}";
             videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>(Episodes);
 
-            var viewHistory = _viewHistoryTable.GetSingle(his =>
+            ViewHistory? viewHistory = _viewHistoryTable.GetSingle(his =>
                 his.VodId == VideoDetail.VodId && his.Source == VideoDetail.Source && his.Name == VideoName);
             if (viewHistory is not null)
+            {
                 videoModel.ViewHistory = new ViewHistory
                 {
                     Id = viewHistory.Id,
@@ -89,7 +93,9 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
                     TotalEpisodeCount = VideoDetail.Episodes.Count,
                     IsLocal = false
                 };
+            }
             else
+            {
                 videoModel.ViewHistory = new ViewHistory
                 {
                     VodId = VideoDetail.VodId,
@@ -102,6 +108,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
                     TotalEpisodeCount = VideoDetail.Episodes.Count,
                     IsLocal = false
                 };
+            }
         }
 
         Close();

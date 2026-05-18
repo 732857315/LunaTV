@@ -8,9 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Refit.HttpClientFactory" Version="10.0.1"/>
+        <PackageReference Include="Refit.HttpClientFactory" Version="10.1.6"/>
         <PackageReference Include="SqlSugarCore" Version="5.1.4.214"/>
-        <PackageReference Include="TouchSocket.WebApi" Version="4.1.4"/>
+        <PackageReference Include="TouchSocket.WebApi" Version="4.2.10"/>
     </ItemGroup>
 
 </Project>

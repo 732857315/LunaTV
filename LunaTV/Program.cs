@@ -1,27 +1,27 @@
 ﻿using Avalonia;
-using System;
-using AsyncImageLoader;
-using AsyncImageLoader.Loaders;
 using Avalonia.Dialogs;
-using Avalonia.Media;
 using LunaTV.Extensions;
 using Microsoft.Extensions.Hosting;
+using System;
 
 namespace LunaTV;
 
-sealed class Program
+internal sealed class Program
 {
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        BuildAvaloniaApp()
+            .StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
     {
-        var host = Host.CreateDefaultBuilder()
+        IHost host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
                 services.AddViewModels();
@@ -37,16 +37,16 @@ sealed class Program
 #pragma warning restore CA1416
             .UsePlatformDetect()
             .With(new Win32PlatformOptions())
-            .With(new FontManagerOptions
-            {
-                FontFallbacks = new[]
-                {
-                    new FontFallback
-                    {
-                        FontFamily = new FontFamily("Microsoft YaHei")
-                    }
-                }
-            })
+            // .With(new FontManagerOptions
+            // {
+            //     FontFallbacks = new[]
+            //     {
+            //         new FontFallback
+            //         {
+            //             FontFamily = new FontFamily("PingFang SC")
+            //         }
+            //     }
+            // })
             .LogToTrace();
     }
 }

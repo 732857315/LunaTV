@@ -264,8 +264,8 @@ public partial class TVShowHomeViewModel : ViewModelBase
     private void NaviHistory()
     {
         var mvm = App.Services.GetRequiredService<MainViewModel>();
-        if (mvm.Pages[0] is TVShowViewModel tvvm)
-            tvvm.SelectedItem = tvvm.Items[2];
+        // if (mvm.Pages[0] is TVShowViewModel tvvm)
+        //     tvvm.SelectedItem = tvvm.Items[2];
     }
 
     public async Task Loading()
@@ -304,17 +304,17 @@ public partial class MovieCardItem : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(name)) return;
         var mvm = App.Services.GetRequiredService<MainViewModel>();
-        if (mvm.Pages[0] is TVShowViewModel tvvm)
-        {
-            tvvm.SelectedItem = tvvm.Items[1];
-            var sview = tvvm.GetControl(tvvm.SelectedItem.Name) as TVShowSearchView;
-            // var svm = sview?.DataContext as TVShowSearchViewModel;
-            if (sview?.DataContext is TVShowSearchViewModel svm)
-            {
-                svm.InputMovieTvName = name;
-                svm.IsAdultMode = false;
-                svm.Search(name);
-            }
-        }
+        // if (mvm.Pages[0] is TVShowViewModel tvvm)
+        // {
+        //     tvvm.SelectedItem = tvvm.Items[1];
+        //     var sview = tvvm.GetControl(tvvm.SelectedItem.Name) as TVShowSearchView;
+        //     // var svm = sview?.DataContext as TVShowSearchViewModel;
+        //     if (sview?.DataContext is TVShowSearchViewModel svm)
+        //     {
+        //         svm.InputMovieTvName = name;
+        //         svm.IsAdultMode = false;
+        //         svm.Search(name);
+        //     }
+        // }
     }
 }

@@ -1,6 +1,4 @@
-﻿using System.Reactive.Disposables;
-using System.Reactive.Linq;
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Layout;
@@ -9,6 +7,8 @@ using Avalonia.Media;
 using Avalonia.Metadata;
 using Avalonia.Platform;
 using Avalonia.VisualTree;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 
 namespace HanumanInstitute.LibMpv.Avalonia;
 
@@ -18,18 +18,17 @@ public class NativeView : NativeControlHost, IVideoView
     public static readonly StyledProperty<object> ContentProperty =
         ContentControl.ContentProperty.AddOwner<NativeView>();
 
-    private IPlatformHandle? _platformHandle;
-
-    private bool _attached;
-    private Window? _floatingContent;
-    private IDisposable _disposables;
-    private IDisposable _isEffectivellyVisibleSub;
-
     // MpvContext property
     public static readonly DirectProperty<NativeView, MpvContext> MpvContextProperty = AvaloniaProperty.RegisterDirect<NativeView, MpvContext>(
         nameof(MpvContext), o => o.MpvContext, defaultBindingMode: BindingMode.OneWayToSource);
-    public MpvContext MpvContext { get; } = new();
-    
+
+    private bool _attached;
+    private IDisposable _disposables;
+    private Window? _floatingContent;
+    private IDisposable _isEffectivellyVisibleSub;
+
+    private IPlatformHandle? _platformHandle;
+
     static NativeView()
     {
         ContentProperty.Changed.AddClassHandler<NativeView>((s, e) => s.InitializeNativeOverlay());
@@ -42,6 +41,14 @@ public class NativeView : NativeControlHost, IVideoView
     {
         get => GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
+    }
+
+    public MpvContext MpvContext { get; } = new();
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
@@ -102,14 +109,14 @@ public class NativeView : NativeControlHost, IVideoView
         {
             _floatingContent = new Window
             {
-                SystemDecorations = SystemDecorations.None,
+                WindowDecorations = WindowDecorations.None,
                 TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent },
                 Background = Brushes.Transparent,
                 SizeToContent = SizeToContent.WidthAndHeight,
                 ShowInTaskbar = false
             };
 
-            _disposables = new CompositeDisposable()
+            _disposables = new CompositeDisposable
             {
                 _floatingContent.Bind(Window.ContentProperty, this.GetObservable(ContentProperty)),
                 this.GetObservable(ContentProperty).Skip(1).Subscribe(_ => UpdateOverlayPosition()),
@@ -125,23 +132,32 @@ public class NativeView : NativeControlHost, IVideoView
     private void ShowNativeOverlay(bool show)
     {
         if (_floatingContent == null || _floatingContent.IsVisible == show)
+        {
             return;
+        }
 
         if (show && _attached)
+        {
             _floatingContent.Show(VisualRoot as Window);
+        }
         else
+        {
             _floatingContent.Hide();
+        }
     }
-    
+
     private void UpdateOverlayPosition()
     {
-        if (_floatingContent == null) { return; }
+        if (_floatingContent == null)
+        {
+            return;
+        }
 
         bool forceSetWidth = false, forceSetHeight = false;
 
         var topLeft = new Point();
 
-        var child = _floatingContent.Presenter?.Child;
+        Control? child = _floatingContent.Presenter?.Child;
 
         if (child?.IsArrangeValid == true)
         {
@@ -177,13 +193,21 @@ public class NativeView : NativeControlHost, IVideoView
         }
 
         if (forceSetWidth && forceSetHeight)
+        {
             _floatingContent.SizeToContent = SizeToContent.Manual;
+        }
         else if (forceSetHeight)
+        {
             _floatingContent.SizeToContent = SizeToContent.Width;
+        }
         else if (forceSetWidth)
+        {
             _floatingContent.SizeToContent = SizeToContent.Height;
+        }
         else
+        {
             _floatingContent.SizeToContent = SizeToContent.Manual;
+        }
 
         _floatingContent.Width = forceSetWidth ? Bounds.Width : double.NaN;
         _floatingContent.Height = forceSetHeight ? Bounds.Height : double.NaN;
@@ -191,14 +215,14 @@ public class NativeView : NativeControlHost, IVideoView
         _floatingContent.MaxWidth = Bounds.Width;
         _floatingContent.MaxHeight = Bounds.Height;
 
-        var newPosition = this.PointToScreen(topLeft);
+        PixelPoint newPosition = this.PointToScreen(topLeft);
 
         if (newPosition != _floatingContent.Position)
         {
             _floatingContent.Position = newPosition;
         }
     }
-    
+
     protected virtual void Dispose(bool disposing)
     {
         if (disposing)
@@ -207,12 +231,6 @@ public class NativeView : NativeControlHost, IVideoView
             _isEffectivellyVisibleSub?.Dispose();
             MpvContext.Dispose();
         }
-    }
-    
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
     }
 }
 #endif

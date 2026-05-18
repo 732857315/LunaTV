@@ -1,73 +1,145 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
-using FluentAvalonia.UI.Controls;
+using CommunityToolkit.Mvvm.Input;
+using LunaTV.Base.Api;
+using LunaTV.Base.DB.UnitOfWork;
+using LunaTV.Base.Models;
+using LunaTV.Constants;
 using LunaTV.ViewModels.Base;
-using LunaTV.Views;
+using LunaTV.ViewModels.TVShowPages;
+using LunaTV.Views.TVShowPages;
+using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace LunaTV.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
-    [ObservableProperty] private PageViewModelBase? _currentPage;
-
-    [ObservableProperty] private List<PageViewModelBase> _footerPages = new();
-
-    [ObservableProperty] private List<PageViewModelBase> _pages = new();
-
-    [ObservableProperty] private object? _selectedCategory;
-
-    public MainViewModel()
+    private readonly Dictionary<string, UserControl> _viewDictionary = new()
     {
-        NavigationFactory = new NavigationFactory(this);
+        ["首页"] = new TVShowHomeView
+        {
+            DataContext = new TVShowHomeViewModel()
+        },
+        ["搜索"] = new TVShowSearchView
+        {
+            DataContext = new TVShowSearchViewModel()
+        },
+        // ["筛选"] = new TVShowFilterView
+        // {
+        //     DataContext = new TVShowFilterViewModel()
+        // },
+        ["历史"] = new TVShowHistoryView
+        {
+            DataContext = new TVShowHistoryViewModel()
+        },
+        ["配置"] = new TVShowSettingView
+        {
+            DataContext = new TVShowSettingViewModel()
+        }
+    };
+
+    private readonly IWebApi _webApi;
+
+    [ObservableProperty] private bool _blockedLoading;
+    [ObservableProperty] private UserControl? _pageContent;
+    [ObservableProperty] private TVMenuItem? _selectedItem;
+
+    public MainViewModel(IWebApi webApi)
+    {
+        _webApi = webApi;
+
+        Items = new ObservableCollection<TVMenuItem>
+        {
+            new()
+            {
+                Name = "首页",
+                Data = App.TopLevel.TryFindResource("SemiIconHome", out object? value1) ? (StreamGeometry)value1 : null
+            },
+            new()
+            {
+                Name = "搜索",
+                Data = App.TopLevel.TryFindResource("SemiIconSearch", out object? value2) ? (StreamGeometry)value2 : null
+            },
+            // new()
+            // {
+            //     Name = "筛选",
+            //     Data = App.TopLevel.TryFindResource("SemiIconFilter", out var value3) ? (StreamGeometry)value3 : null,
+            // },
+            new()
+            {
+                Name = "历史",
+                Data = App.TopLevel.TryFindResource("SemiIconHistory", out object? value4) ? (StreamGeometry)value4 : null
+            },
+            new()
+            {
+                Name = "下载",
+                Data = App.TopLevel.TryFindResource("SemiIconDownload", out object? value5) ? (StreamGeometry)value5 : null
+            },
+            new()
+            {
+                Name = "配置",
+                Data = App.TopLevel.TryFindResource("SemiIconSetting", out object? value6) ? (StreamGeometry)value6 : null
+            }
+        };
+        SelectedItem = Items[0];
+
+
+        //初始化配置
+        AppConifg.SelectApis.Clear();
+        var apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
+        var apiSources = apiSourceTable.GetList();
+        AppConifg.SelectApis.Clear();
+        AppConifg.SelectAdultApis.Clear();
+        AppConifg.SelectApis.AddRange(apiSources.Where(api => api.IsEnable && !api.IsAdult).Select(api => api.Source));
+        AppConifg.SelectAdultApis.AddRange(apiSources.Where(api => api.IsEnable && api.IsAdult)
+            .Select(api => api.Source));
     }
 
-    public NavigationFactory NavigationFactory { get; }
+    public ObservableCollection<TVMenuItem> Items { get; set; }
 
-    public double PaneWidth => 200;
-
-    public void Loaded()
+    partial void OnSelectedItemChanged(TVMenuItem? value)
     {
-        // Set only if null, since this may be called again when content dialogs open
-        CurrentPage ??= Pages.FirstOrDefault();
-        SelectedCategory ??= Pages.FirstOrDefault();
+        if (value == null) return;
+        ToView(value.Name);
+    }
+
+    [RelayCommand]
+    private void ToView(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return;
+        if (_viewDictionary.TryGetValue(content, out UserControl? control))
+        {
+            PageContent = control;
+        }
+        else
+        {
+            PageContent = content switch
+            {
+                "历史" => new TVShowHistoryView
+                {
+                    DataContext = new TVShowHistoryViewModel()
+                },
+                "配置" => new TVShowSettingView
+                {
+                    DataContext = new TVShowSettingViewModel()
+                },
+                _ => null
+            };
+        }
+    }
+
+    public UserControl GetControl(string name)
+    {
+        return _viewDictionary[name];
     }
 }
 
-public class NavigationFactory : INavigationPageFactory
+public class TVMenuItem
 {
-    public NavigationFactory(MainViewModel owner)
-    {
-        Owner = owner;
-    }
-
-    public MainViewModel Owner { get; }
-
-    public Control GetPage(Type srcType)
-    {
-        return null;
-    }
-
-    public Control GetPageFromObject(object target)
-    {
-        if (target is PageViewModelBase)
-        {
-            var viewTypeName = target.GetType().FullName!.Replace("ViewModel", "View");
-            var viewType = Type.GetType(viewTypeName);
-            var notFound = new TextBlock { Text = "View not found for " + viewTypeName };
-            if (viewType is null || ServiceLocator.GetRequiredService(viewType) is not Control view) return notFound;
-
-            view.DataContext = target;
-            return view;
-        }
-
-        if (target is string)
-            if (target.Equals("设置"))
-                return ServiceLocator.GetRequiredService<SettingsView>();
-
-        return new TextBlock { Text = "啥也没找到啊" };
-        ;
-    }
+    public string Name { get; set; }
+    public StreamGeometry Data { get; set; }
 }

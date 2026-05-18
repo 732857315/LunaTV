@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
+using LunaTV.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using System.Runtime.InteropServices;
 using Ursa.Controls;
 

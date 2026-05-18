@@ -14,7 +14,7 @@
         <ProjectReference Include="..\MpvDll\MpvDll.csproj" Exclude="All">
             <ExcludeAssets>All</ExcludeAssets>
         </ProjectReference>
-        <PackageReference Include="ConfigureAwait.Fody" Version="3.3.2"/>
-        <PackageReference Include="HanumanInstitute.Validators" Version="2.1.1"/>
+        <PackageReference Include="ConfigureAwait.Fody" Version="3.4.0"/>
+        <PackageReference Include="HanumanInstitute.Validators" Version="2.1.2"/>
     </ItemGroup>
 </Project>
