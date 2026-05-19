@@ -51,4 +51,5 @@
         </Style>
     </u:UrsaWindow.Styles>
     <views:MainView Margin="0,30,0,0" />
+    <!-- <ContentControl Name="ContentControl" /> -->
 </u:UrsaWindow>

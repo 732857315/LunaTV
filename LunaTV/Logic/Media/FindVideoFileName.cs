@@ -1,0 +1,93 @@
+﻿using LunaTV.Constants;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
+namespace LunaTV.Logic.Media;
+
+public static class FindVideoFileName
+{
+    public static bool TryFindVideoFileName(string inputFileName, out string videoFileName, bool openSearchParentFolder = true)
+    {
+        videoFileName = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(inputFileName))
+        {
+            return false;
+        }
+
+        var visitedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        bool result = TryFindVideoFileNameInner(inputFileName, out videoFileName, visitedPaths);
+
+        if (!result && openSearchParentFolder)
+        {
+            // Try again with the folder one level up (if any)
+            string? directory = Path.GetDirectoryName(inputFileName);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                string? parentDirectory = Path.GetDirectoryName(directory);
+                if (!string.IsNullOrEmpty(parentDirectory))
+                {
+                    string fileName = Path.GetFileName(inputFileName);
+                    string newInputFileName = Path.Combine(parentDirectory, fileName);
+                    result = TryFindVideoFileNameInner(newInputFileName, out videoFileName, visitedPaths);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static bool TryFindVideoFileNameInner(string inputFileName, out string videoFileName, HashSet<string> visitedPaths)
+    {
+        videoFileName = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(inputFileName))
+        {
+            return false;
+        }
+
+        // Prevent infinite recursion
+        if (visitedPaths.Contains(inputFileName))
+        {
+            return false;
+        }
+        visitedPaths.Add(inputFileName);
+
+        // Try appending video/audio extensions to the input file name
+        foreach (string extension in Utilities.VideoFileExtensions.Concat(Utilities.AudioFileExtensions))
+        {
+            string candidateFileName = inputFileName + extension;
+            if (File.Exists(candidateFileName))
+            {
+                videoFileName = candidateFileName;
+                return true;
+            }
+        }
+
+        // Try removing file extension (e.g., "movie.en.srt" -> "movie.en")
+        int lastDotIndex = inputFileName.LastIndexOf('.');
+        if (lastDotIndex > 0)
+        {
+            string withoutExtension = inputFileName.Substring(0, lastDotIndex);
+            if (TryFindVideoFileNameInner(withoutExtension, out videoFileName, visitedPaths))
+            {
+                return true;
+            }
+        }
+
+        // Try removing suffix after underscore (e.g., "movie_en" -> "movie")
+        int lastUnderscoreIndex = inputFileName.LastIndexOf('_');
+        if (lastUnderscoreIndex > 0)
+        {
+            string withoutSuffix = inputFileName.Substring(0, lastUnderscoreIndex);
+            if (TryFindVideoFileNameInner(withoutSuffix, out videoFileName, visitedPaths))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
