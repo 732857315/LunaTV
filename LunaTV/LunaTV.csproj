@@ -42,4 +42,11 @@
         <ProjectReference Include="..\LunaTV.Base\LunaTV.Base.csproj"/>
         <ProjectReference Include="..\M3U8Download\M3U8Download.csproj"/>
     </ItemGroup>
+
+    <ItemGroup Condition="'$(RuntimeIdentifier)'=='win-x64' or '$(RuntimeIdentifier)'==''">
+        <Content Include="ffmpeg\win-x64\**">
+            <Link>%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 </Project>

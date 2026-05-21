@@ -17,7 +17,7 @@ namespace N_m3u8DL_RE.DownloadManager;
 internal class HTTPLiveRecordManager
 {
     private static HttpClient HttpClient = new();
-    
+
     IDownloader Downloader;
     DownloaderConfig DownloaderConfig;
     StreamExtractor StreamExtractor;
@@ -32,9 +32,10 @@ internal class HTTPLiveRecordManager
     CancellationTokenSource CancellationTokenSource = new(); // 取消Wait
     List<byte> InfoBuffer = new List<byte>(188 * 5000); // 5000个分包中解析信息，没有就算了
 
-    public HTTPLiveRecordManager(DownloaderConfig downloaderConfig, List<StreamSpec> selectedSteams, StreamExtractor streamExtractor)
+    public HTTPLiveRecordManager(DownloaderConfig downloaderConfig, List<StreamSpec> selectedSteams,
+        StreamExtractor streamExtractor)
     {
-        this.DownloaderConfig = downloaderConfig;
+        DownloaderConfig = downloaderConfig;
         Downloader = new SimpleDownloader(DownloaderConfig);
         NowDateTime = DateTime.Now;
         PublishDateTime = selectedSteams.FirstOrDefault()?.PublishTime;
@@ -48,14 +49,16 @@ internal class HTTPLiveRecordManager
         task.StartTask();
 
         var name = streamSpec.ToShortString();
-        var dirName = $"{DownloaderConfig.MyOptions.SaveName ?? NowDateTime.ToString("yyyy-MM-dd_HH-mm-ss")}_{task.Id}_{OtherUtil.GetValidFileName(streamSpec.GroupId ?? "", "-")}_{streamSpec.Codecs}_{streamSpec.Bandwidth}_{streamSpec.Language}";
+        var dirName =
+            $"{DownloaderConfig.MyOptions.SaveName ?? NowDateTime.ToString("yyyy-MM-dd_HH-mm-ss")}_{task.Id}_{OtherUtil.GetValidFileName(streamSpec.GroupId ?? "", "-")}_{streamSpec.Codecs}_{streamSpec.Bandwidth}_{streamSpec.Language}";
         var saveDir = DownloaderConfig.MyOptions.SaveDir ?? Environment.CurrentDirectory;
 
         // Use SavePattern if provided, otherwise use SaveName or dirName
         var saveName = dirName;
         if (!string.IsNullOrWhiteSpace(DownloaderConfig.MyOptions.SavePattern))
         {
-            saveName = OtherUtil.FormatSavePattern(DownloaderConfig.MyOptions.SavePattern, streamSpec, DownloaderConfig.MyOptions.SaveName, task.Id);
+            saveName = OtherUtil.FormatSavePattern(DownloaderConfig.MyOptions.SavePattern, streamSpec,
+                DownloaderConfig.MyOptions.SaveName, task.Id);
         }
         else if (DownloaderConfig.MyOptions.SaveName != null)
         {
@@ -73,9 +76,11 @@ internal class HTTPLiveRecordManager
         {
             request.Headers.TryAddWithoutValidation(item.Key, item.Value);
         }
+
         Logger.Debug(request.Headers.ToString());
 
-        using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, CancellationTokenSource.Token);
+        using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
+            CancellationTokenSource.Token);
         response.EnsureSuccessStatusCode();
 
         var output = Path.Combine(saveDir, saveName + ".ts");
@@ -97,6 +102,7 @@ internal class HTTPLiveRecordManager
                 {
                     InfoBuffer.AddRange(buffer);
                 }
+
                 speedContainer.Add(size);
                 RecordingSizeDic[task.Id] += size;
                 await stream.WriteAsync(buffer, 0, size);
@@ -135,7 +141,8 @@ internal class HTTPLiveRecordManager
                 if (data[i] == 0x47 && (i + 188) < data.Length && data[i + 188] == 0x47)
                 {
                     var tsData = data.Skip(i).Take(188);
-                    var tsHeaderInt = BitConverter.ToUInt32(BitConverter.IsLittleEndian ? tsData.Take(4).Reverse().ToArray() : tsData.Take(4).ToArray(), 0);
+                    var tsHeaderInt = BitConverter.ToUInt32(
+                        BitConverter.IsLittleEndian ? tsData.Take(4).Reverse().ToArray() : tsData.Take(4).ToArray(), 0);
                     var pid = (tsHeaderInt & 0x1fff00) >> 8;
                     var tsPayload = tsData.Skip(4);
                     // PAT
@@ -156,11 +163,14 @@ internal class HTTPLiveRecordManager
                             var descriptorsLoopLength = (ConvertToUint16(dscripData.Skip(3).Take(2))) & 0xfff;
                             var descriptorsData = dscripData.Skip(5).Take(descriptorsLoopLength);
                             var serviceProviderLength = (int)descriptorsData.Skip(3).First();
-                            serviceProvider = Encoding.UTF8.GetString(descriptorsData.Skip(4).Take(serviceProviderLength).ToArray());
+                            serviceProvider =
+                                Encoding.UTF8.GetString(descriptorsData.Skip(4).Take(serviceProviderLength).ToArray());
                             var serviceNameLength = (int)descriptorsData.Skip(4 + serviceProviderLength).First();
-                            serviceName = Encoding.UTF8.GetString(descriptorsData.Skip(5 + serviceProviderLength).Take(serviceNameLength).ToArray());
+                            serviceName = Encoding.UTF8.GetString(descriptorsData.Skip(5 + serviceProviderLength)
+                                .Take(serviceNameLength).ToArray());
                         }
                     }
+
                     if (programId != "" && (serviceName != "" || serviceProvider != ""))
                         break;
                 }
@@ -169,8 +179,10 @@ internal class HTTPLiveRecordManager
             if (!string.IsNullOrEmpty(programId))
             {
                 Logger.InfoMarkUp($"Program Id: [cyan]{programId.EscapeMarkup()}[/]");
-                if (!string.IsNullOrEmpty(serviceName)) Logger.InfoMarkUp($"Service Name: [cyan]{serviceName.EscapeMarkup()}[/]");
-                if (!string.IsNullOrEmpty(serviceProvider)) Logger.InfoMarkUp($"Service Provider: [cyan]{serviceProvider.EscapeMarkup()}[/]");
+                if (!string.IsNullOrEmpty(serviceName))
+                    Logger.InfoMarkUp($"Service Name: [cyan]{serviceName.EscapeMarkup()}[/]");
+                if (!string.IsNullOrEmpty(serviceProvider))
+                    Logger.InfoMarkUp($"Service Provider: [cyan]{serviceProvider.EscapeMarkup()}[/]");
                 READ_IFO = true;
             }
         }
@@ -215,6 +227,7 @@ internal class HTTPLiveRecordManager
         {
             progressColumns = progressColumns.SkipLast(1).ToArray();
         }
+
         progress.Columns(progressColumns);
 
         await progress.StartAsync(async ctx =>
@@ -232,7 +245,8 @@ internal class HTTPLiveRecordManager
             DownloaderConfig.MyOptions.LiveRecordLimit ??= TimeSpan.MaxValue;
             var limit = DownloaderConfig.MyOptions.LiveRecordLimit;
             if (limit != TimeSpan.MaxValue)
-                Logger.WarnMarkUp($"[darkorange3_1]{ResString.liveLimit}{GlobalUtil.FormatTime((int)limit.Value.TotalSeconds)}[/]");
+                Logger.WarnMarkUp(
+                    $"[darkorange3_1]{ResString.liveLimit}{GlobalUtil.FormatTime((int)limit.Value.TotalSeconds)}[/]");
             // 录制直播时，用户选了几个流就并发录几个
             var options = new ParallelOptions()
             {

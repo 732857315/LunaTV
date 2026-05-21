@@ -163,7 +163,6 @@ public partial class TVDownloadViewModel : ViewModelBase
             _isDownloading = false;
         });
 
-        Console.WriteLine("122222222222222222222222222222");
         timer.Stop();
         if (_downloadManager!.DownloadStatus.Count > 0)
         {

@@ -1,5 +1,13 @@
 ﻿namespace M3U8Download;
 
+public enum DownloadType
+{
+    None,
+    Downloading,
+    Downloaded,
+    DownloadFailed
+}
+
 public class DownloadStatus
 {
     public double percentage { get; set; }
@@ -9,5 +17,8 @@ public class DownloadStatus
     public string speed { get; set; } = String.Empty;
     public TimeSpan? remainingTime { get; set; }
     public string remainingTimeStr { get; set; } = string.Empty;
-    public string? description { get; set; }
+    public string? name { get; set; }
+    public string? url { get; set; }
+    public string? saveDir { get; set; }
+    public DownloadType downloadType { get; set; } = DownloadType.None;
 }

@@ -687,7 +687,10 @@ internal class LunaDownloadManager
             var description = item.ToShortShortString();
             _downloadStatus[_taskId] = new DownloadStatus
             {
-                description = description
+                name = DownloaderConfig.MyOptions.SaveName,
+                url = DownloaderConfig.MyOptions.BaseUrl,
+                saveDir = DownloaderConfig.MyOptions.SaveDir,
+                downloadType = DownloadType.None
             };
             var task = new ProgressTask(_taskId, description, 100, false);
             SpeedContainerDic[_taskId] = new SpeedContainer(); // 速度计算
