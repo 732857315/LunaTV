@@ -19,7 +19,11 @@ public class MacFunctionResolver : FunctionResolverBase
 
     protected override string[] GetSearchPaths()
     {
-        return new[] { MpvApi.RootPath };
+        return new[]
+        {
+            MpvApi.RootPath,
+            "/usr/local/lib"
+        };
     }
 
     protected override IntPtr LoadNativeLibrary(string libraryName)
