@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace LunaTV.Logic.LibMpvDynamic;
+namespace LunaTV.LibMPV2.LibMpvDynamic;
 
 public class AudioTrackInfo
 {
@@ -14,22 +14,13 @@ public class AudioTrackInfo
     {
         var parts = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(Title))
-        {
-            parts.Add(Title);
-        }
+        if (!string.IsNullOrWhiteSpace(Title)) parts.Add(Title);
 
-        if (!string.IsNullOrWhiteSpace(Language))
-        {
-            parts.Add($"[{Language}]");
-        }
+        if (!string.IsNullOrWhiteSpace(Language)) parts.Add($"[{Language}]");
 
         parts.Add($"(ID: {Id})");
 
-        if (IsSelected)
-        {
-            parts.Add("*");
-        }
+        if (IsSelected) parts.Add("*");
 
         return string.Join(" ", parts);
     }

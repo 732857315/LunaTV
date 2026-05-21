@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -5,10 +7,9 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using System;
-using System.Diagnostics;
+using LunaTV.LibMpv2.LibMpvDynamic;
 
-namespace LunaTV.Logic.LibMpvDynamic;
+namespace LunaTV.LibMPV2.LibMpvDynamic;
 
 public class LibMpvDynamicSoftwareControl : Control
 {
@@ -28,10 +29,7 @@ public class LibMpvDynamicSoftwareControl : Control
     {
         base.OnInitialized();
 
-        if (Player == null)
-        {
-            throw new InvalidOperationException("MpvPlayer is not initialized");
-        }
+        if (Player == null) throw new InvalidOperationException("MpvPlayer is not initialized");
 
         Debug.WriteLine("Initializing MpvPlayer with software rendering");
 
@@ -65,7 +63,7 @@ public class LibMpvDynamicSoftwareControl : Control
             return;
         }
 
-        PixelSize bitmapSize = GetPixelSize();
+        var bitmapSize = GetPixelSize();
 
         if (bitmapSize.Width <= 0 || bitmapSize.Height <= 0)
         {
@@ -95,12 +93,12 @@ public class LibMpvDynamicSoftwareControl : Control
 
         try
         {
-            using (ILockedFramebuffer lockedBitmap = _renderTarget.Lock())
+            using (var lockedBitmap = _renderTarget.Lock())
             {
 #if ANDROID
         var pixelFormat = "rgba";
 #else
-                string pixelFormat = "bgra";
+                var pixelFormat = "bgra";
 #endif
                 Player.SoftwareRender(
                     lockedBitmap.Size.Width,

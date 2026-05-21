@@ -1,16 +1,17 @@
-﻿using Avalonia.Media;
-using Avalonia.Media.Imaging;
-using CommunityToolkit.Mvvm.ComponentModel;
-using LunaTV.Constants;
-using LunaTV.Extensions;
-using SkiaSharp;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.ComponentModel;
+using LunaTV.Constants;
+using LunaTV.Extensions;
+using LunaTV.LibMpv2;
+using SkiaSharp;
 
-namespace LunaTV.Logic.Media;
+namespace LunaTV.LibMPV2.Media;
 
 public partial class BurnInLogo : ObservableObject
 {
@@ -30,14 +31,16 @@ public partial class BurnInLogo : ObservableObject
 
 public class FfmpegGenerator
 {
-    public static Process GenerateEmptyAudio(string outputFileName, float seconds, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process GenerateEmptyAudio(string outputFileName, float seconds,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var processMakeVideo = new Process
         {
             StartInfo =
             {
                 FileName = GetFfmpegLocation(),
-                Arguments = $"-f lavfi -i anullsrc -t {seconds.ToString(CultureInfo.InvariantCulture)} \"{outputFileName}\"",
+                Arguments =
+                    $"-f lavfi -i anullsrc -t {seconds.ToString(CultureInfo.InvariantCulture)} \"{outputFileName}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
@@ -48,10 +51,11 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static Process MergeAudioTracks(string inputFileName1, string inputFileName2, string outputFileName, float startSeconds, bool forceStereo, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process MergeAudioTracks(string inputFileName1, string inputFileName2, string outputFileName,
+        float startSeconds, bool forceStereo, DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        string filterSuffix = forceStereo ? ",aformat=channel_layouts=stereo" : string.Empty;
-        string stereoParameter = forceStereo ? " -ac 2" : string.Empty;
+        var filterSuffix = forceStereo ? ",aformat=channel_layouts=stereo" : string.Empty;
+        var stereoParameter = forceStereo ? " -ac 2" : string.Empty;
 
         var processMakeVideo = new Process
         {
@@ -84,85 +88,55 @@ public class FfmpegGenerator
     /// <summary>
     ///     Generate ffmpeg parameters for a video with a burned-in Advanced Sub Station Alpha subtitle.
     /// </summary>
-    public static string GenerateHardcodedVideoFile(string inputVideoFileName, string assaSubtitleFileName, string outputVideoFileName, int width, int height, string videoEncoding, string preset, string pixelFormat,
-        string crf, string audioEncoding, bool forceStereo, string sampleRate, string tune, string audioBitRate, string pass, string twoPassBitRate, string? cutStart = null, string? cutEnd = null,
+    public static string GenerateHardcodedVideoFile(string inputVideoFileName, string assaSubtitleFileName,
+        string outputVideoFileName, int width, int height, string videoEncoding, string preset, string pixelFormat,
+        string crf, string audioEncoding, bool forceStereo, string sampleRate, string tune, string audioBitRate,
+        string pass, string twoPassBitRate, string? cutStart = null, string? cutEnd = null,
         string audioCutTrack = "", BurnInLogo? burnInLogo = null)
     {
-        if (width % 2 == 1)
-        {
-            width++;
-        }
+        if (width % 2 == 1) width++;
 
-        if (height % 2 == 1)
-        {
-            height++;
-        }
+        if (height % 2 == 1) height++;
 
-        string videoEncodingSettings = string.Empty;
+        var videoEncodingSettings = string.Empty;
         if (!string.IsNullOrWhiteSpace(videoEncoding))
         {
             videoEncodingSettings = $"-c:v {videoEncoding}";
-            if (videoEncoding == "libx265")
-            {
-                videoEncodingSettings += " -tag:v hvc1";
-            }
+            if (videoEncoding == "libx265") videoEncodingSettings += " -tag:v hvc1";
         }
 
-        string audioSettings = $"-c:a {audioEncoding}";
+        var audioSettings = $"-c:a {audioEncoding}";
         if (audioEncoding != "copy")
         {
             audioSettings += $" -ar {sampleRate}";
-            if (forceStereo)
-            {
-                audioSettings += " -ac 2";
-            }
+            if (forceStereo) audioSettings += " -ac 2";
         }
 
-        if (!string.IsNullOrWhiteSpace(pixelFormat))
-        {
-            pixelFormat = $"-pix_fmt {pixelFormat}";
-        }
+        if (!string.IsNullOrWhiteSpace(pixelFormat)) pixelFormat = $"-pix_fmt {pixelFormat}";
 
         audioSettings = audioCutTrack + " " + audioSettings;
 
-        string presetSettings = string.Empty;
+        var presetSettings = string.Empty;
         if (!string.IsNullOrWhiteSpace(preset))
         {
             if (videoEncoding == "prores_ks")
             {
                 if (preset == "proxy")
-                {
                     preset = "0";
-                }
                 else if (preset == "lt")
-                {
                     preset = "1";
-                }
                 else if (preset == "standard")
-                {
                     preset = "2";
-                }
                 else if (preset == "hq")
-                {
                     preset = "3";
-                }
                 else if (preset == "4444")
-                {
                     preset = "4";
-                }
                 else if (preset == "4444xq")
-                {
                     preset = "5";
-                }
                 else
-                {
                     preset = string.Empty;
-                }
 
-                if (!string.IsNullOrWhiteSpace(preset))
-                {
-                    presetSettings = $" -profile:v {preset}";
-                }
+                if (!string.IsNullOrWhiteSpace(preset)) presetSettings = $" -profile:v {preset}";
             }
             else
             {
@@ -170,86 +144,67 @@ public class FfmpegGenerator
             }
         }
 
-        string crfSettings = string.Empty;
+        var crfSettings = string.Empty;
         if (!string.IsNullOrWhiteSpace(crf) && string.IsNullOrWhiteSpace(pass))
         {
             if (videoEncoding == "h264_nvenc" || videoEncoding == "hevc_nvenc")
-            {
                 crfSettings = $" -cq {crf}";
-            }
             else if (videoEncoding == "h264_amf" || videoEncoding == "hevc_amf")
-            {
                 crfSettings = $" -quality {crf}";
-            }
             else
-            {
                 crfSettings = $" -crf {crf}";
-            }
         }
 
-        string tuneParameter = string.Empty;
-        if (!string.IsNullOrWhiteSpace(tune))
-        {
-            tuneParameter = $" -tune {tune}";
-        }
+        var tuneParameter = string.Empty;
+        if (!string.IsNullOrWhiteSpace(tune)) tuneParameter = $" -tune {tune}";
 
         outputVideoFileName = $"\"{outputVideoFileName}\"";
 
-        string passSettings = string.Empty;
+        var passSettings = string.Empty;
         if (!string.IsNullOrWhiteSpace(pass) && !string.IsNullOrWhiteSpace(twoPassBitRate))
         {
             passSettings = $" -b:v {twoPassBitRate} -pass {pass}";
 
-            if (!string.IsNullOrWhiteSpace(audioBitRate))
-            {
-                passSettings += $" -b:a {audioBitRate}";
-            }
+            if (!string.IsNullOrWhiteSpace(audioBitRate)) passSettings += $" -b:a {audioBitRate}";
 
             if (pass == "1")
             {
-                string ext = Path.GetExtension(outputVideoFileName.Trim('"')).ToLowerInvariant().TrimStart('.');
-                string outputType = ext == "mkv" ? "matroska" : ext;
+                var ext = Path.GetExtension(outputVideoFileName.Trim('"')).ToLowerInvariant().TrimStart('.');
+                var outputType = ext == "mkv" ? "matroska" : ext;
                 outputVideoFileName = GlobalDefine.IsRunningOnWindows ? $"-f {outputType} NUL" : "-f mp4 /dev/null";
             }
         }
 
         if (!string.IsNullOrWhiteSpace(cutStart))
-        {
             cutStart = " " + cutStart.Trim() + " ";
-        }
         else
-        {
             cutStart = " ";
-        }
 
         if (!string.IsNullOrWhiteSpace(cutEnd))
-        {
             cutEnd = " " + cutEnd.Trim() + " ";
-        }
         else
-        {
             cutEnd = " ";
-        }
 
         // Add logo overlay if specified
-        string logoInput = string.Empty;
-        string filterParameter = $"-vf \"scale={width}:{height},ass={Path.GetFileName(assaSubtitleFileName)}\"";
+        var logoInput = string.Empty;
+        var filterParameter = $"-vf \"scale={width}:{height},ass={Path.GetFileName(assaSubtitleFileName)}\"";
 
-        if (burnInLogo != null && !string.IsNullOrEmpty(burnInLogo.LogoFileName) && File.Exists(burnInLogo.LogoFileName))
+        if (burnInLogo != null && !string.IsNullOrEmpty(burnInLogo.LogoFileName) &&
+            File.Exists(burnInLogo.LogoFileName))
         {
             logoInput = $" -i \"{burnInLogo.LogoFileName}\"";
 
             // Convert alpha percentage (0-100) to 0.0-1.0
-            string alphaValue = (burnInLogo.Alpha / 100.0).ToString(CultureInfo.InvariantCulture);
-            string sizePercent = burnInLogo.Size.ToString(CultureInfo.InvariantCulture);
+            var alphaValue = (burnInLogo.Alpha / 100.0).ToString(CultureInfo.InvariantCulture);
+            var sizePercent = burnInLogo.Size.ToString(CultureInfo.InvariantCulture);
 
             // Build filter_complex for video with logo overlay
             // 1. Scale main video and apply subtitles
             // 2. Scale logo by size percentage and apply alpha transparency
             // 3. Overlay logo at specified X, Y position
-            string filterComplex = $"[0:v]scale={width}:{height},ass={Path.GetFileName(assaSubtitleFileName)}[withsubs];" +
-                                   $"[1:v]scale=iw*{sizePercent}/100:ih*{sizePercent}/100,format=rgba,colorchannelmixer=aa={alphaValue}[logo];" +
-                                   $"[withsubs][logo]overlay={burnInLogo.X}:{burnInLogo.Y}";
+            var filterComplex = $"[0:v]scale={width}:{height},ass={Path.GetFileName(assaSubtitleFileName)}[withsubs];" +
+                                $"[1:v]scale=iw*{sizePercent}/100:ih*{sizePercent}/100,format=rgba,colorchannelmixer=aa={alphaValue}[logo];" +
+                                $"[withsubs][logo]overlay={burnInLogo.X}:{burnInLogo.Y}";
 
             filterParameter = $"-filter_complex \"{filterComplex}\"";
         }
@@ -258,9 +213,10 @@ public class FfmpegGenerator
             $"{cutStart}-i \"{inputVideoFileName}\"{logoInput}{cutEnd} {filterParameter} -g 30 -bf 2 -s {width}x{height} {videoEncodingSettings} {passSettings} {presetSettings} {crfSettings} {pixelFormat} {audioSettings}{tuneParameter} -use_editlist 0 -movflags +faststart {outputVideoFileName}";
     }
 
-    private static Process GetFFmpegProcess(string imageFileName, string outputFileName, int videoWidth, int videoHeight, int seconds, decimal frameRate, bool addTimeCode = false, string addTimeColor = "white")
+    private static Process GetFFmpegProcess(string imageFileName, string outputFileName, int videoWidth,
+        int videoHeight, int seconds, decimal frameRate, bool addTimeCode = false, string addTimeColor = "white")
     {
-        string drawText = MakeDrawText(addTimeCode, frameRate, addTimeColor);
+        var drawText = MakeDrawText(addTimeCode, frameRate, addTimeColor);
 
         return new Process
         {
@@ -275,21 +231,17 @@ public class FfmpegGenerator
         };
     }
 
-    private static Process GetFFmpegProcess(Color color, string outputFileName, int videoWidth, int videoHeight, int seconds, decimal frameRate, bool addTimeCode = false, string addTimeColor = "white")
+    private static Process GetFFmpegProcess(Color color, string outputFileName, int videoWidth, int videoHeight,
+        int seconds, decimal frameRate, bool addTimeCode = false, string addTimeColor = "white")
     {
-        if (videoWidth % 2 == 1)
-        {
-            videoWidth++;
-        }
+        if (videoWidth % 2 == 1) videoWidth++;
 
-        if (videoHeight % 2 == 1)
-        {
-            videoHeight++;
-        }
+        if (videoHeight % 2 == 1) videoHeight++;
 
-        string htmlColor = $"#{(color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2")).ToUpperInvariant()}";
+        var htmlColor =
+            $"#{(color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2")).ToUpperInvariant()}";
 
-        string drawText = MakeDrawText(addTimeCode, frameRate, addTimeColor);
+        var drawText = MakeDrawText(addTimeCode, frameRate, addTimeColor);
 
         return new Process
         {
@@ -306,11 +258,10 @@ public class FfmpegGenerator
 
     private static string MakeDrawText(bool addTimeCode, decimal frameRate, string addTimeColor)
     {
-        string drawText = string.Empty;
+        var drawText = string.Empty;
         if (addTimeCode)
-        {
-            drawText = $" -vf \"drawtext=timecode='00\\:00\\:00\\:00':r={frameRate.ToString(CultureInfo.InvariantCulture)}:x=10:y=10:fontsize=34:fontcolor={addTimeColor}\"";
-        }
+            drawText =
+                $" -vf \"drawtext=timecode='00\\:00\\:00\\:00':r={frameRate.ToString(CultureInfo.InvariantCulture)}:x=10:y=10:fontsize=34:fontcolor={addTimeColor}\"";
 
         return drawText;
     }
@@ -318,19 +269,17 @@ public class FfmpegGenerator
     public static string GetScreenShot(string inputFileName, string timeCode, string colorMatrix = "")
     {
         timeCode = timeCode.Replace(',', '.');
-        string outputFileName = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
-        string vfMatrix = string.Empty;
-        if (!string.IsNullOrEmpty(colorMatrix))
-        {
-            vfMatrix = $"-vf colormatrix={colorMatrix}";
-        }
+        var outputFileName = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
+        var vfMatrix = string.Empty;
+        if (!string.IsNullOrEmpty(colorMatrix)) vfMatrix = $"-vf colormatrix={colorMatrix}";
 
         var process = new Process
         {
             StartInfo =
             {
                 FileName = GetFfmpegLocation(),
-                Arguments = $"-ss {timeCode} -i \"{inputFileName}\" {vfMatrix} -frames:v 1 -c:v png \"{outputFileName}\"",
+                Arguments =
+                    $"-ss {timeCode} -i \"{inputFileName}\" {vfMatrix} -frames:v 1 -c:v png \"{outputFileName}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
@@ -346,27 +295,22 @@ public class FfmpegGenerator
 
     internal static string? GetScreenShotWithSubtitle(string previewSubtitle, int width, int height)
     {
-        string tempAssFileName = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.ass");
+        var tempAssFileName = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.ass");
         File.WriteAllText(tempAssFileName, previewSubtitle);
 
-        string outputFileName = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
+        var outputFileName = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
 
-        if (width % 2 == 1)
-        {
-            width++;
-        }
+        if (width % 2 == 1) width++;
 
-        if (height % 2 == 1)
-        {
-            height++;
-        }
+        if (height % 2 == 1) height++;
 
         var process = new Process
         {
             StartInfo =
             {
                 FileName = GetFfmpegLocation(),
-                Arguments = $"-f lavfi -i \"color=c=black@0.0:s={width}x{height}:d=0.1,format=rgba,subtitles=f={Path.GetFileName(tempAssFileName)}:alpha=1\" -frames:v 1 -c:v png \"{outputFileName}\"",
+                Arguments =
+                    $"-f lavfi -i \"color=c=black@0.0:s={width}x{height}:d=0.1,format=rgba,subtitles=f={Path.GetFileName(tempAssFileName)}:alpha=1\" -frames:v 1 -c:v png \"{outputFileName}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WorkingDirectory = Path.GetDirectoryName(tempAssFileName) ?? string.Empty
@@ -381,10 +325,7 @@ public class FfmpegGenerator
 
         try
         {
-            if (File.Exists(tempAssFileName))
-            {
-                File.Delete(tempAssFileName);
-            }
+            if (File.Exists(tempAssFileName)) File.Delete(tempAssFileName);
         }
         catch
         {
@@ -397,7 +338,7 @@ public class FfmpegGenerator
     public static string[] GetScreenShotsForEachFrame(string videoFileName, string outputFolder)
     {
         Directory.CreateDirectory(outputFolder);
-        string outputFileName = Path.Combine(outputFolder, "image%05d.png");
+        var outputFileName = Path.Combine(outputFolder, "image%05d.png");
         var process = new Process
         {
             StartInfo =
@@ -418,11 +359,9 @@ public class FfmpegGenerator
 
     private static string GetFfmpegLocation()
     {
-        string ffmpegLocation = GlobalDefine.FFmpegPath;
+        var ffmpegLocation = GlobalDefine.FFmpegPath;
         if (!GlobalDefine.IsRunningOnWindows && (string.IsNullOrEmpty(ffmpegLocation) || !File.Exists(ffmpegLocation)))
-        {
             ffmpegLocation = "ffmpeg";
-        }
 
         return ffmpegLocation;
     }
@@ -449,7 +388,7 @@ public class FfmpegGenerator
 #pragma warning disable CA1416 // Validate platform compatibility
             _ = process.Start();
 #pragma warning restore CA1416 // Validate platform compatibility
-            string output = process.StandardOutput.ReadToEnd();
+            var output = process.StandardOutput.ReadToEnd();
             process.WaitForExit(5000);
             return output.Contains("rubberband");
         }
@@ -459,9 +398,10 @@ public class FfmpegGenerator
         }
     }
 
-    public static Process ChangeSpeed(string inputFileName, string outputFileName, float inputSpeed, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ChangeSpeed(string inputFileName, string outputFileName, float inputSpeed,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        float speed = Math.Max(0.5f, inputSpeed);
+        var speed = Math.Max(0.5f, inputSpeed);
         speed = Math.Min(100, speed);
         speed = (float)Math.Round(speed, 3, MidpointRounding.AwayFromZero);
 
@@ -470,7 +410,8 @@ public class FfmpegGenerator
             StartInfo =
             {
                 FileName = GetFfmpegLocation(),
-                Arguments = $"-i \"{inputFileName}\" -filter:a \"atempo={speed.ToString(CultureInfo.InvariantCulture)}\" \"{outputFileName}\"",
+                Arguments =
+                    $"-i \"{inputFileName}\" -filter:a \"atempo={speed.ToString(CultureInfo.InvariantCulture)}\" \"{outputFileName}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
@@ -481,7 +422,8 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static Process TrimSilenceStartAndEnd(string inputFileName, string outputFileName, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process TrimSilenceStartAndEnd(string inputFileName, string outputFileName,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var processMakeVideo = new Process
         {
@@ -507,13 +449,14 @@ public class FfmpegGenerator
     ///     without affecting phonemes at all.
     /// </summary>
     /// <param name="maxSilenceSeconds">Maximum allowed silence duration between words (e.g. 0.15 for 150ms)</param>
-    public static Process CompressInternalSilence(string inputFileName, string outputFileName, double maxSilenceSeconds = 0.15, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process CompressInternalSilence(string inputFileName, string outputFileName,
+        double maxSilenceSeconds = 0.15, DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        string maxSilence = maxSilenceSeconds.ToString("0.00", CultureInfo.InvariantCulture);
+        var maxSilence = maxSilenceSeconds.ToString("0.00", CultureInfo.InvariantCulture);
         // silenceremove: stop_periods=-1 processes ALL silence gaps (not just first)
         // stop_duration = max allowed silence length; stop_threshold = silence detection level
         // This keeps all speech intact and only compresses pauses between words
-        string filter = $"silenceremove=stop_periods=-1:stop_duration={maxSilence}:stop_threshold=-40dB";
+        var filter = $"silenceremove=stop_periods=-1:stop_duration={maxSilence}:stop_threshold=-40dB";
 
         var processMakeVideo = new Process
         {
@@ -537,9 +480,10 @@ public class FfmpegGenerator
     ///     speed factors, because it uses a proper WSOLA algorithm designed for speech/music.
     ///     Falls back to atempo if rubberband is not available in the FFmpeg build.
     /// </summary>
-    public static Process ChangeSpeedHighQuality(string inputFileName, string outputFileName, float inputSpeed, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ChangeSpeedHighQuality(string inputFileName, string outputFileName, float inputSpeed,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        float speed = Math.Max(0.5f, inputSpeed);
+        var speed = Math.Max(0.5f, inputSpeed);
         speed = Math.Min(100, speed);
         speed = (float)Math.Round(speed, 3, MidpointRounding.AwayFromZero);
 
@@ -547,8 +491,8 @@ public class FfmpegGenerator
         // transients=smooth: smoother transient handling for speech
         // engine=faster: use the faster engine (good enough for speech)
         // window=short: short analysis window, better for speech than music
-        string speedStr = speed.ToString(CultureInfo.InvariantCulture);
-        string filter = $"rubberband=tempo={speedStr}:transients=smooth:engine=faster:window=short";
+        var speedStr = speed.ToString(CultureInfo.InvariantCulture);
+        var filter = $"rubberband=tempo={speedStr}:transients=smooth:engine=faster:window=short";
 
         var processMakeVideo = new Process
         {
@@ -566,17 +510,19 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static Process AddAudioTrack(string inputFileName, string audioFileName, string outputFileName, string audioEncoding, bool? stereo, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process AddAudioTrack(string inputFileName, string audioFileName, string outputFileName,
+        string audioEncoding, bool? stereo, DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        string audioEncodingString = !string.IsNullOrEmpty(audioEncoding) ? "-c:a " + audioEncoding + " " : "-c:a copy ";
-        string stereoString = stereo == true ? "-ac 2 " : string.Empty;
+        var audioEncodingString = !string.IsNullOrEmpty(audioEncoding) ? "-c:a " + audioEncoding + " " : "-c:a copy ";
+        var stereoString = stereo == true ? "-ac 2 " : string.Empty;
 
         var processMakeVideo = new Process
         {
             StartInfo =
             {
                 FileName = GetFfmpegLocation(),
-                Arguments = $"-i \"{inputFileName}\" -i \"{audioFileName}\" -c:v copy -map 0:v:0 -map 1:a:0 {audioEncodingString}{stereoString}\"{outputFileName}\"",
+                Arguments =
+                    $"-i \"{inputFileName}\" -i \"{audioFileName}\" -c:v copy -map 0:v:0 -map 1:a:0 {audioEncodingString}{stereoString}\"{outputFileName}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
@@ -590,12 +536,14 @@ public class FfmpegGenerator
     /// <summary>
     ///     Add audio track to video with ducking - reduce original audio volume and mix with TTS audio.
     /// </summary>
-    public static Process AddAudioTrackWithDucking(string inputFileName, string audioFileName, string outputFileName, string audioEncoding, bool? stereo, int originalVolumePercent,
+    public static Process AddAudioTrackWithDucking(string inputFileName, string audioFileName, string outputFileName,
+        string audioEncoding, bool? stereo, int originalVolumePercent,
         DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        string audioEncodingString = !string.IsNullOrEmpty(audioEncoding) ? "-c:a " + audioEncoding + " " : string.Empty;
-        string stereoString = stereo == true ? "-ac 2 " : string.Empty;
-        string volumeFactor = Math.Clamp(originalVolumePercent / 100.0, 0.0, 1.0).ToString("0.00", CultureInfo.InvariantCulture);
+        var audioEncodingString = !string.IsNullOrEmpty(audioEncoding) ? "-c:a " + audioEncoding + " " : string.Empty;
+        var stereoString = stereo == true ? "-ac 2 " : string.Empty;
+        var volumeFactor = Math.Clamp(originalVolumePercent / 100.0, 0.0, 1.0)
+            .ToString("0.00", CultureInfo.InvariantCulture);
 
         var processMakeVideo = new Process
         {
@@ -618,10 +566,11 @@ public class FfmpegGenerator
     ///     Apply pro audio post-processing chain: low-pass, EQ warmth, compression, loudness normalization, noise gate, and
     ///     fade in/out.
     /// </summary>
-    public static Process ApplyProAudioChain(string inputFileName, string outputFileName, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ApplyProAudioChain(string inputFileName, string outputFileName,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         // Chain: low-pass 2400Hz → bass warmth +6dB@200Hz → treble reduce -5dB@2500Hz → noise gate → compression → loudness normalization → tiny fade in/out
-        string filters = string.Join(",",
+        var filters = string.Join(",",
             "lowpass=f=2400",
             "equalizer=f=200:t=h:width=100:g=6",
             "equalizer=f=2500:t=h:width=500:g=-5",
@@ -650,9 +599,10 @@ public class FfmpegGenerator
     /// <summary>
     ///     Generate a silence audio file with a given duration in milliseconds.
     /// </summary>
-    public static Process GenerateSilence(string outputFileName, int durationMs, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process GenerateSilence(string outputFileName, int durationMs,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
-        string seconds = (durationMs / 1000.0).ToString("0.000", CultureInfo.InvariantCulture);
+        var seconds = (durationMs / 1000.0).ToString("0.000", CultureInfo.InvariantCulture);
         var processMakeVideo = new Process
         {
             StartInfo =
@@ -672,14 +622,16 @@ public class FfmpegGenerator
     /// <summary>
     ///     Concatenate two audio files (used for appending silence padding to a segment).
     /// </summary>
-    public static Process ConcatAudio(string inputFileName1, string inputFileName2, string outputFileName, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ConcatAudio(string inputFileName1, string inputFileName2, string outputFileName,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var processMakeVideo = new Process
         {
             StartInfo =
             {
                 FileName = GetFfmpegLocation(),
-                Arguments = $"-i \"{inputFileName1}\" -i \"{inputFileName2}\" -filter_complex \"[0:a][1:a]concat=n=2:v=0:a=1[aout]\" -map \"[aout]\" \"{outputFileName}\"",
+                Arguments =
+                    $"-i \"{inputFileName1}\" -i \"{inputFileName2}\" -filter_complex \"[0:a][1:a]concat=n=2:v=0:a=1[aout]\" -map \"[aout]\" \"{outputFileName}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
@@ -693,7 +645,8 @@ public class FfmpegGenerator
     /// <summary>
     ///     Change sample rate of an audio file.
     /// </summary>
-    public static Process ChangeSampleRate(string inputFileName, string outputFileName, int sampleRate, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ChangeSampleRate(string inputFileName, string outputFileName, int sampleRate,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var processMakeVideo = new Process
         {
@@ -711,7 +664,8 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static Process ConvertFormat(string inputFileName, string outputFileName, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ConvertFormat(string inputFileName, string outputFileName,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var processMakeVideo = new Process
         {
@@ -729,7 +683,8 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static Process ConvertToAc2(string inputFileName, string outputFileName, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ConvertToAc2(string inputFileName, string outputFileName,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var processMakeVideo = new Process
         {
@@ -752,7 +707,8 @@ public class FfmpegGenerator
     ///     voice-clone reference WAV, which only does "atomic" cloning at 24 kHz mono — other
     ///     sample rates / channel counts silently fall back to the default voice.
     /// </summary>
-    public static Process ConvertToMono24kHzWav(string inputFileName, string outputFileName, DataReceivedEventHandler? dataReceivedHandler = null)
+    public static Process ConvertToMono24kHzWav(string inputFileName, string outputFileName,
+        DataReceivedEventHandler? dataReceivedHandler = null)
     {
         var process = new Process
         {
@@ -770,17 +726,12 @@ public class FfmpegGenerator
         return process;
     }
 
-    public static string GenerateTransparentVideoFile(string assaSubtitleFileName, string outputVideoFileName, int width, int height, string frameRate, string timeCode)
+    public static string GenerateTransparentVideoFile(string assaSubtitleFileName, string outputVideoFileName,
+        int width, int height, string frameRate, string timeCode)
     {
-        if (width % 2 == 1)
-        {
-            width++;
-        }
+        if (width % 2 == 1) width++;
 
-        if (height % 2 == 1)
-        {
-            height++;
-        }
+        if (height % 2 == 1) height++;
 
         outputVideoFileName = $"\"{outputVideoFileName}\"";
 
@@ -789,41 +740,38 @@ public class FfmpegGenerator
                 .TrimStart();
     }
 
-    public static Process GenerateVideoFile(string previewFileName, int seconds, int width, int height, Color color, bool checkered, decimal frameRate, Bitmap? bitmap,
+    public static Process GenerateVideoFile(string previewFileName, int seconds, int width, int height, Color color,
+        bool checkered, decimal frameRate, Bitmap? bitmap,
         DataReceivedEventHandler? dataReceivedHandler = null, bool addTimeCode = false, string addTimeColor = "white")
     {
         Process processMakeVideo;
 
-        if (width % 2 == 1)
-        {
-            width++;
-        }
+        if (width % 2 == 1) width++;
 
-        if (height % 2 == 1)
-        {
-            height++;
-        }
+        if (height % 2 == 1) height++;
 
         if (bitmap != null)
         {
-            string tempImageFileName = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
-            using (SKBitmap skBitmap = bitmap.ToSkBitmap())
+            var tempImageFileName = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+            using (var skBitmap = bitmap.ToSkBitmap())
             {
-                using (SKBitmap resizedBitmap = ResizeBitmap(skBitmap, width, height))
+                using (var resizedBitmap = ResizeBitmap(skBitmap, width, height))
                 {
-                    using (SKImage? image = SKImage.FromBitmap(resizedBitmap))
-                    using (SKData? data = image.Encode(SKEncodedImageFormat.Png, 100))
-                    using (FileStream stream = File.OpenWrite(tempImageFileName))
+                    using (var image = SKImage.FromBitmap(resizedBitmap))
+                    using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                    using (var stream = File.OpenWrite(tempImageFileName))
                     {
                         data.SaveTo(stream);
                     }
                 }
             }
-            processMakeVideo = GetFFmpegProcess(tempImageFileName, previewFileName, width, height, seconds, frameRate, addTimeCode, addTimeColor);
+
+            processMakeVideo = GetFFmpegProcess(tempImageFileName, previewFileName, width, height, seconds, frameRate,
+                addTimeCode, addTimeColor);
         }
         else if (checkered)
         {
-            string tempImageFileName = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+            var tempImageFileName = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
             var skBitmap = new SKBitmap(width, height, true);
             using (var canvas = new SKCanvas(skBitmap))
             {
@@ -831,21 +779,23 @@ public class FfmpegGenerator
                 canvas.DrawBitmap(skBitmap, 0, 0);
             }
 
-            using (SKBitmap resizedBitmap = ResizeBitmap(skBitmap, width, height))
+            using (var resizedBitmap = ResizeBitmap(skBitmap, width, height))
             {
-                using (SKImage? image = SKImage.FromBitmap(resizedBitmap))
-                using (SKData? data = image.Encode(SKEncodedImageFormat.Png, 100))
-                using (FileStream stream = File.OpenWrite(tempImageFileName))
+                using (var image = SKImage.FromBitmap(resizedBitmap))
+                using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                using (var stream = File.OpenWrite(tempImageFileName))
                 {
                     data.SaveTo(stream);
                 }
             }
 
-            processMakeVideo = GetFFmpegProcess(tempImageFileName, previewFileName, width, height, seconds, frameRate, addTimeCode, addTimeColor);
+            processMakeVideo = GetFFmpegProcess(tempImageFileName, previewFileName, width, height, seconds, frameRate,
+                addTimeCode, addTimeColor);
         }
         else
         {
-            processMakeVideo = GetFFmpegProcess(color, previewFileName, width, height, seconds, frameRate, addTimeCode, addTimeColor);
+            processMakeVideo = GetFFmpegProcess(color, previewFileName, width, height, seconds, frameRate, addTimeCode,
+                addTimeColor);
         }
 
         SetupDataReceiveHandler(dataReceivedHandler, processMakeVideo);
@@ -870,20 +820,15 @@ public class FfmpegGenerator
         return resizedBitmap;
     }
 
-    public static Process ReEncodeVideoForSubtitling(string inputVideoFileName, string outputVideoFileName, int width, int height, string frameRate, DataReceivedEventHandler? dataReceivedHandler)
+    public static Process ReEncodeVideoForSubtitling(string inputVideoFileName, string outputVideoFileName, int width,
+        int height, string frameRate, DataReceivedEventHandler? dataReceivedHandler)
     {
-        if (width % 2 == 1)
-        {
-            width++;
-        }
+        if (width % 2 == 1) width++;
 
-        if (height % 2 == 1)
-        {
-            height++;
-        }
+        if (height % 2 == 1) height++;
 
         outputVideoFileName = $"\"{outputVideoFileName}\"";
-        int frameRateInt = (int)double.Parse(frameRate, CultureInfo.InvariantCulture);
+        var frameRateInt = (int)double.Parse(frameRate, CultureInfo.InvariantCulture);
 
         var processMakeVideo = new Process
         {
@@ -910,7 +855,8 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static Process GetProcess(string parameters, DataReceivedEventHandler? dataReceivedHandler, string workingDirectory = "")
+    public static Process GetProcess(string parameters, DataReceivedEventHandler? dataReceivedHandler,
+        string workingDirectory = "")
     {
         var processMakeVideo = new Process
         {
@@ -933,21 +879,16 @@ public class FfmpegGenerator
         return processMakeVideo;
     }
 
-    public static string GetReEncodeVideoForSubtitlingParameters(string inputVideoFileName, string outputVideoFileName, int width, int height, string frameRate)
+    public static string GetReEncodeVideoForSubtitlingParameters(string inputVideoFileName, string outputVideoFileName,
+        int width, int height, string frameRate)
     {
-        if (width % 2 == 1)
-        {
-            width++;
-        }
+        if (width % 2 == 1) width++;
 
-        if (height % 2 == 1)
-        {
-            height++;
-        }
+        if (height % 2 == 1) height++;
 
         outputVideoFileName = $"\"{outputVideoFileName}\"";
 
-        string arguments =
+        var arguments =
             $"-y -i \"{inputVideoFileName}\" " +
             $"-vf scale={width}:{height},fps={frameRate} " +
             $"-c:v libx264 -preset veryfast -movflags +faststart " +
@@ -985,26 +926,21 @@ public class FfmpegGenerator
         string outputFileName,
         int audioTrackFfIndex = -1)
     {
-        string start = $"{startSeconds:0.000}".Replace(",", ".");
-        string duration = $"{durationSeconds:0.000}".Replace(",", ".");
+        var start = $"{startSeconds:0.000}".Replace(",", ".");
+        var duration = $"{durationSeconds:0.000}".Replace(",", ".");
 
         // Base parameters
-        string args = $"-y -ss {start} -t {duration} -i \"{videoFileName}\"";
+        var args = $"-y -ss {start} -t {duration} -i \"{videoFileName}\"";
 
         // Select the requested audio stream (e.g. for videos with multiple audio tracks).
-        if (audioTrackFfIndex >= 0)
-        {
-            args += $" -map 0:{audioTrackFfIndex}";
-        }
+        if (audioTrackFfIndex >= 0) args += $" -map 0:{audioTrackFfIndex}";
 
         args += " -vn -ar 16000 -b:a 32k";
 
         // Optional center-channel only
         if (useCenterChannelOnly)
-        {
             // Extract center channel: pan mono|c0=c2
             args += " -af \"pan=mono|c0=c2\"";
-        }
 
         // Add output file name
         args += $" \"{outputFileName}\"";

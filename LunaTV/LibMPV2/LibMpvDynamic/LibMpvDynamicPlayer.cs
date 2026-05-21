@@ -1,5 +1,3 @@
-using LunaTV.Constants;
-using LunaTV.Logic.Media;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,8 +7,12 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
 using System.Threading.Tasks;
+using LunaTV.Constants;
+using LunaTV.LibMPV2.LibMpvDynamic;
+using LunaTV.LibMPV2.Media;
+using LunaTV.Logic.LibMpvDynamic;
 
-namespace LunaTV.Logic.LibMpvDynamic;
+namespace LunaTV.LibMpv2.LibMpvDynamic;
 
 public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 {
@@ -102,24 +104,18 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     {
         get
         {
-            if (_mpv == IntPtr.Zero || _mpvClientApiVersion == null)
-            {
-                return string.Empty;
-            }
+            if (_mpv == IntPtr.Zero || _mpvClientApiVersion == null) return string.Empty;
 
-            ulong version = _mpvClientApiVersion();
-            ulong high = version >> 16;
-            ulong low = version & 0xff;
+            var version = _mpvClientApiVersion();
+            var high = version >> 16;
+            var low = version & 0xff;
             return high + "." + low;
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
         _disposed = true;
 
@@ -138,10 +134,7 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     public bool CanLoad()
     {
-        if (_library != IntPtr.Zero)
-        {
-            return true;
-        }
+        if (_library != IntPtr.Zero) return true;
 
         return LoadLibraryInternal();
     }
@@ -159,8 +152,8 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         // For audio-only files there is no video track, so mpv never fires the render
         // callback and subtitles are never drawn.  Inject a virtual black video stream
         // via lavfi so mpv has something to render subtitles on top of.
-        string ext = Path.GetExtension(path);
-        bool isAudioOnly = Array.Exists(Utilities.AudioFileExtensions,
+        var ext = Path.GetExtension(path);
+        var isAudioOnly = Array.Exists(Utilities.AudioFileExtensions,
             e => e.Equals(ext, StringComparison.OrdinalIgnoreCase));
         SetOptionString("lavfi-complex", isAudioOnly ? "color=black:size=1280x720:rate=25[vo]" : "");
 
@@ -168,64 +161,50 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         SetOptionString("end", "none");
         _audioEndBound = null;
 
-        int err = await Task.Run(() => DoMpvCommand("loadfile", path));
-        if (_disposed)
-        {
-            return;
-        }
+        var err = await Task.Run(() => DoMpvCommand("loadfile", path));
+        if (_disposed) return;
 
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         if (OperatingSystem.IsMacOS())
         {
             // add yt-dlp to the process PATH on macOS so mpv can find it for youtube URLs
-            string[] macYtDlpPaths = new[]
+            var macYtDlpPaths = new[]
             {
-                "/opt/local/bin/yt-dlp",    // MacPorts
-                "/usr/local/bin/yt-dlp",    // Homebrew (Intel)
+                "/opt/local/bin/yt-dlp", // MacPorts
+                "/usr/local/bin/yt-dlp", // Homebrew (Intel)
                 "/opt/homebrew/bin/yt-dlp", // Homebrew (Apple Silicon)
                 "/usr/bin/yt-dlp"
             };
-            foreach (string ytDlpPath in macYtDlpPaths)
-            {
+            foreach (var ytDlpPath in macYtDlpPaths)
                 if (File.Exists(ytDlpPath))
                 {
-                    string dir = Path.GetDirectoryName(ytDlpPath)!;
-                    string currentPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+                    var dir = Path.GetDirectoryName(ytDlpPath)!;
+                    var currentPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
                     if (!currentPath.Split(Path.PathSeparator).Contains(dir))
-                    {
                         Environment.SetEnvironmentVariable("PATH", currentPath + Path.PathSeparator + dir);
-                    }
                     break;
                 }
-            }
         }
         else if (OperatingSystem.IsLinux())
         {
             // add yt-dlp to the process PATH on Linux so mpv can find it for youtube URLs
-            string[] linuxYtDlpPaths = new[]
+            var linuxYtDlpPaths = new[]
             {
                 "/usr/local/bin/yt-dlp",
                 "/usr/bin/yt-dlp",
                 "/opt/yt-dlp/yt-dlp",
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local/bin/yt-dlp")
             };
-            foreach (string ytDlpPath in linuxYtDlpPaths)
-            {
+            foreach (var ytDlpPath in linuxYtDlpPaths)
                 if (File.Exists(ytDlpPath))
                 {
-                    string dir = Path.GetDirectoryName(ytDlpPath)!;
-                    string currentPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+                    var dir = Path.GetDirectoryName(ytDlpPath)!;
+                    var currentPath = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
                     if (!currentPath.Split(Path.PathSeparator).Contains(dir))
-                    {
                         Environment.SetEnvironmentVariable("PATH", currentPath + Path.PathSeparator + dir);
-                    }
                     break;
                 }
-            }
         }
 
         SetOptionString("keep-open", "always");
@@ -248,9 +227,7 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             // playback to stop before the real end of the file (issue #10953).
             double? bound = null;
             if (ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
-            {
                 bound = Mp3DurationReader.TryGetDurationSeconds(path);
-            }
 
             if (bound.HasValue && bound.Value > 0)
             {
@@ -259,15 +236,16 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             }
             else
             {
-                for (int i = 0; i < 50 && !_disposed; i++)
+                for (var i = 0; i < 50 && !_disposed; i++)
                 {
-                    double d = Duration;
+                    var d = Duration;
                     if (d > 0 && !double.IsInfinity(d) && !double.IsNaN(d))
                     {
                         SetOptionString("end", d.ToString(CultureInfo.InvariantCulture));
                         _audioEndBound = d;
                         break;
                     }
+
                     await Task.Delay(50);
                 }
             }
@@ -278,16 +256,10 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     {
         _pausedValue = null;
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
-        int err = DoMpvCommand("cycle", "pause");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("cycle", "pause");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
     }
 
     public void CloseFile()
@@ -297,17 +269,11 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         _audioEndBound = null;
 
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
         // Stop playback and clear the current file/playlist, returning to idle
-        int err = DoMpvCommand("stop");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("stop");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         // Ask UI to repaint so any previously rendered frame can be cleared
         RequestRender?.Invoke();
@@ -318,21 +284,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         get
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-            {
-                return false;
-            }
+            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return false;
 
             try
             {
                 double pauseValue = 0;
-                byte[] nameBytes = GetUtf8Bytes("pause");
-                int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_FLAG, ref pauseValue);
+                var nameBytes = GetUtf8Bytes("pause");
+                var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_FLAG, ref pauseValue);
 
-                if (err < 0)
-                {
-                    return false;
-                }
+                if (err < 0) return false;
 
                 return pauseValue == 0; // pause=0 means playing
             }
@@ -348,21 +308,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         get
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-            {
-                return false;
-            }
+            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return false;
 
             try
             {
                 double pauseValue = 0;
-                byte[] nameBytes = GetUtf8Bytes("pause");
-                int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_FLAG, ref pauseValue);
+                var nameBytes = GetUtf8Bytes("pause");
+                var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_FLAG, ref pauseValue);
 
-                if (err < 0)
-                {
-                    return false;
-                }
+                if (err < 0) return false;
 
                 return pauseValue != 0;
             }
@@ -382,32 +336,20 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             // earlier in the session, _pausedValue still holds that stale seek target and
             // the cache below would return it, causing the position to "jump back" to the
             // last seek when playback completes. See #10835 / #10877.
-            if (_audioEndBound.HasValue && IsEofReached())
-            {
-                return _audioEndBound.Value;
-            }
+            if (_audioEndBound.HasValue && IsEofReached()) return _audioEndBound.Value;
 
-            if (_pausedValue.HasValue && IsPaused && !GlobalDefine.UseFrameMode)
-            {
-                return _pausedValue.Value;
-            }
+            if (_pausedValue.HasValue && IsPaused && !GlobalDefine.UseFrameMode) return _pausedValue.Value;
 
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-            {
-                return 0;
-            }
+            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return 0;
 
             try
             {
                 double position = 0;
-                byte[] nameBytes = GetUtf8Bytes("time-pos");
-                int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref position);
+                var nameBytes = GetUtf8Bytes("time-pos");
+                var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref position);
 
-                if (err < 0)
-                {
-                    return 0;
-                }
+                if (err < 0) return 0;
 
                 return position;
             }
@@ -420,12 +362,9 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         {
             _pausedValue = value;
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero)
-            {
-                return;
-            }
+            if (_mpv == IntPtr.Zero) return;
 
-            int err = DoMpvCommand("seek", value.ToString(CultureInfo.InvariantCulture), "absolute");
+            var err = DoMpvCommand("seek", value.ToString(CultureInfo.InvariantCulture), "absolute");
             //if (err < 0)
             //{
             //    Se.LogError(new InvalidOperationException(GetErrorString(err)), "LibMpvDynamicPlayer Position set");
@@ -438,21 +377,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         get
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-            {
-                return 0;
-            }
+            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return 0;
 
             try
             {
                 double duration = 0;
-                byte[] nameBytes = GetUtf8Bytes("duration");
-                int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref duration);
+                var nameBytes = GetUtf8Bytes("duration");
+                var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref duration);
 
-                if (err < 0)
-                {
-                    return 0;
-                }
+                if (err < 0) return 0;
 
                 return duration;
             }
@@ -470,21 +403,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         get
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-            {
-                return 100;
-            }
+            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return 100;
 
             try
             {
                 double volume = 100;
-                byte[] nameBytes = GetUtf8Bytes("volume");
-                int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref volume);
+                var nameBytes = GetUtf8Bytes("volume");
+                var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref volume);
 
-                if (err < 0)
-                {
-                    return 100;
-                }
+                if (err < 0) return 100;
 
                 return volume;
             }
@@ -496,14 +423,11 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         set
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero)
-            {
-                return;
-            }
+            if (_mpv == IntPtr.Zero) return;
 
             // Clamp volume between 0 and 100
-            double clampedVolume = Math.Max(0, Math.Min(100, value));
-            int err = DoMpvCommand("set", "volume", clampedVolume.ToString(CultureInfo.InvariantCulture));
+            var clampedVolume = Math.Max(0, Math.Min(100, value));
+            var err = DoMpvCommand("set", "volume", clampedVolume.ToString(CultureInfo.InvariantCulture));
             //if (err < 0)
             //{
             //    Se.LogError(new InvalidOperationException(GetErrorString(err)), "LibMpvDynamicPlayer Volume set");
@@ -516,21 +440,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         get
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-            {
-                return 1.0;
-            }
+            if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return 1.0;
 
             try
             {
-                double speed = 1.0;
-                byte[] nameBytes = GetUtf8Bytes("speed");
-                int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref speed);
+                var speed = 1.0;
+                var nameBytes = GetUtf8Bytes("speed");
+                var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_DOUBLE, ref speed);
 
-                if (err < 0)
-                {
-                    return 1.0;
-                }
+                if (err < 0) return 1.0;
 
                 return speed;
             }
@@ -542,14 +460,11 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         set
         {
             EnsureNotDisposed();
-            if (_mpv == IntPtr.Zero)
-            {
-                return;
-            }
+            if (_mpv == IntPtr.Zero) return;
 
             // Clamp speed to reasonable values (0.25x to 4x)
-            double clampedSpeed = Math.Max(0.25, Math.Min(4.0, value));
-            int err = DoMpvCommand("set", "speed", clampedSpeed.ToString(CultureInfo.InvariantCulture));
+            var clampedSpeed = Math.Max(0.25, Math.Min(4.0, value));
+            var err = DoMpvCommand("set", "speed", clampedSpeed.ToString(CultureInfo.InvariantCulture));
             //if (err < 0)
             //{
             //    Se.LogError(new InvalidOperationException(GetErrorString(err)), "LibMpvDynamicPlayer Speed set");
@@ -561,24 +476,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     {
         _pausedValue = null;
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
         // Pause playback first
-        int err = DoMpvCommand("set", "pause", "yes");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("set", "pause", "yes");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         // Seek back to position 0
         err = DoMpvCommand("seek", "0", "absolute");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         // Request render to show the first frame
         RequestRender?.Invoke();
@@ -588,61 +494,40 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     {
         _pausedValue = null;
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
-        int err = DoMpvCommand("set", "pause", "no");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("set", "pause", "no");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
     }
 
     public void Pause()
     {
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
-        int err = DoMpvCommand("set", "pause", "yes");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("set", "pause", "yes");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
     }
 
     public AudioTrackInfo? ToggleAudioTrack()
     {
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return null;
-        }
+        if (_mpv == IntPtr.Zero) return null;
 
         try
         {
             var audioTracks = GetAudioTracks();
 
-            if (audioTracks.Count == 0)
-            {
-                return null;
-            }
+            if (audioTracks.Count == 0) return null;
 
             // Find current track and select next one
-            int currentIdx = audioTracks.FindIndex(t => t.IsSelected);
-            int nextIdx = currentIdx >= 0 ? (currentIdx + 1) % audioTracks.Count : 0;
-            AudioTrackInfo nextTrack = audioTracks[nextIdx];
+            var currentIdx = audioTracks.FindIndex(t => t.IsSelected);
+            var nextIdx = currentIdx >= 0 ? (currentIdx + 1) % audioTracks.Count : 0;
+            var nextTrack = audioTracks[nextIdx];
 
             // Switch to the next audio track by ID
-            int err = DoMpvCommand("set", "aid", nextTrack.Id.ToString(CultureInfo.InvariantCulture));
-            if (err < 0)
-            {
-                throw new InvalidOperationException(GetErrorString(err));
-            }
+            var err = DoMpvCommand("set", "aid", nextTrack.Id.ToString(CultureInfo.InvariantCulture));
+            if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
             return nextTrack;
         }
@@ -656,34 +541,22 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     private static string[] GetLibraryNames()
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return ["libmpv-2.dll"];
-        }
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return ["libmpv.so.2", "libmpv.so"];
-        }
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return ["libmpv.dylib", "libmpv.2.dylib"];
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return ["libmpv-2.dll"];
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return ["libmpv.so.2", "libmpv.so"];
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return ["libmpv.dylib", "libmpv.2.dylib"];
         throw new PlatformNotSupportedException("Unsupported OS platform.");
     }
 
     private static string[] GetLibraryPaths()
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
             return
             [
                 MpvPath,
                 Directory.GetCurrentDirectory(),
                 string.Empty
             ];
-        }
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
             return
             [
                 MpvPath,
@@ -701,9 +574,7 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 "/usr/lib/arm-linux-gnueabihf",
                 "/lib/arm-linux-gnueabihf"
             ];
-        }
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
             return
             [
                 MpvPath,
@@ -714,7 +585,6 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 "/opt/homebrew/lib",
                 "/opt/lib"
             ];
-        }
         throw new PlatformNotSupportedException("Unsupported OS platform.");
     }
 
@@ -735,35 +605,38 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         _mpvTerminateDestroy = (MpvTerminateDestroy)GetDllType(typeof(MpvTerminateDestroy), "mpv_terminate_destroy");
 
         // Load render API functions
-        _mpvRenderContextCreate = (MpvRenderContextCreate)GetDllType(typeof(MpvRenderContextCreate), "mpv_render_context_create");
-        _mpvRenderContextRender = (MpvRenderContextRender)GetDllType(typeof(MpvRenderContextRender), "mpv_render_context_render");
-        _mpvRenderContextFree = (MpvRenderContextFree)GetDllType(typeof(MpvRenderContextFree), "mpv_render_context_free");
-        _mpvRenderContextSetUpdateCallback = (MpvRenderContextSetUpdateCallback)GetDllType(typeof(MpvRenderContextSetUpdateCallback), "mpv_render_context_set_update_callback");
+        _mpvRenderContextCreate =
+            (MpvRenderContextCreate)GetDllType(typeof(MpvRenderContextCreate), "mpv_render_context_create");
+        _mpvRenderContextRender =
+            (MpvRenderContextRender)GetDllType(typeof(MpvRenderContextRender), "mpv_render_context_render");
+        _mpvRenderContextFree =
+            (MpvRenderContextFree)GetDllType(typeof(MpvRenderContextFree), "mpv_render_context_free");
+        _mpvRenderContextSetUpdateCallback =
+            (MpvRenderContextSetUpdateCallback)GetDllType(typeof(MpvRenderContextSetUpdateCallback),
+                "mpv_render_context_set_update_callback");
     }
 
     private object GetDllType(Type type, string name)
     {
-        IntPtr address = NativeMethods.CrossGetProcAddress(_library, name);
+        var address = NativeMethods.CrossGetProcAddress(_library, name);
         return address != IntPtr.Zero ? Marshal.GetDelegateForFunctionPointer(address, type) : IntPtr.Zero;
     }
 
     private bool LoadLibraryInternal()
     {
-        foreach (string libName in GetLibraryNames())
+        foreach (var libName in GetLibraryNames())
+        foreach (var libPath in GetLibraryPaths())
         {
-            foreach (string libPath in GetLibraryPaths())
+            var fullPath = Path.Combine(libPath, libName);
+            if (File.Exists(fullPath))
             {
-                string fullPath = Path.Combine(libPath, libName);
-                if (File.Exists(fullPath))
+                var libHandle = NativeMethods.CrossLoadLibrary(fullPath);
+                if (libHandle != IntPtr.Zero)
                 {
-                    IntPtr libHandle = NativeMethods.CrossLoadLibrary(fullPath);
-                    if (libHandle != IntPtr.Zero)
-                    {
-                        _library = libHandle;
-                        LoadLibMpvMethods();
-                        _mpv = _mpvCreate!.Invoke();
-                        return true;
-                    }
+                    _library = libHandle;
+                    LoadLibMpvMethods();
+                    _mpv = _mpvCreate!.Invoke();
+                    return true;
                 }
             }
         }
@@ -773,19 +646,13 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     public void LoadLib()
     {
-        if (_library == IntPtr.Zero)
-        {
-            LoadLibraryInternal();
-        }
+        if (_library == IntPtr.Zero) LoadLibraryInternal();
     }
 
     public int Initialize()
     {
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero || _mpvInitialize == null)
-        {
-            return -1;
-        }
+        if (_mpv == IntPtr.Zero || _mpvInitialize == null) return -1;
 
         return _mpvInitialize(_mpv);
     }
@@ -797,36 +664,30 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     public string GetErrorString(int error)
     {
-        if (_mpvErrorString == null)
-        {
-            return $"mpv error {error}";
-        }
+        if (_mpvErrorString == null) return $"mpv error {error}";
 
-        IntPtr ptr = _mpvErrorString(error);
+        var ptr = _mpvErrorString(error);
         return ptr == IntPtr.Zero ? $"mpv error {error}" : Marshal.PtrToStringUTF8(ptr) ?? $"mpv error {error}";
     }
 
     public int SetOptionString(string name, string value)
     {
-        if (_mpvSetOptionString == null || _mpv == IntPtr.Zero)
-        {
-            return -1;
-        }
+        if (_mpvSetOptionString == null || _mpv == IntPtr.Zero) return -1;
 
-        byte[] nameBytes = GetUtf8Bytes(name);
-        byte[] valueBytes = GetUtf8Bytes(value);
+        var nameBytes = GetUtf8Bytes(name);
+        var valueBytes = GetUtf8Bytes(value);
         return _mpvSetOptionString(_mpv, nameBytes, valueBytes);
     }
 
     public static IntPtr AllocateUtf8IntPtrArrayWithSentinel(string[] arr, out IntPtr[] byteArrayPointers)
     {
-        int numberOfStrings = arr.Length + 1;
+        var numberOfStrings = arr.Length + 1;
         byteArrayPointers = new IntPtr[numberOfStrings];
-        IntPtr rootPointer = Marshal.AllocCoTaskMem(IntPtr.Size * numberOfStrings);
-        for (int index = 0; index < arr.Length; index++)
+        var rootPointer = Marshal.AllocCoTaskMem(IntPtr.Size * numberOfStrings);
+        for (var index = 0; index < arr.Length; index++)
         {
-            byte[] bytes = GetUtf8Bytes(arr[index]);
-            IntPtr unmanagedPointer = Marshal.AllocHGlobal(bytes.Length);
+            var bytes = GetUtf8Bytes(arr[index]);
+            var unmanagedPointer = Marshal.AllocHGlobal(bytes.Length);
             Marshal.Copy(bytes, 0, unmanagedPointer, bytes.Length);
             byteArrayPointers[index] = unmanagedPointer;
         }
@@ -837,17 +698,11 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     private int DoMpvCommand(params string[] args)
     {
-        if (_mpv == IntPtr.Zero || _mpvCommand == null)
-        {
-            return 0;
-        }
+        if (_mpv == IntPtr.Zero || _mpvCommand == null) return 0;
 
-        IntPtr mainPtr = AllocateUtf8IntPtrArrayWithSentinel(args, out IntPtr[] byteArrayPointers);
-        int result = _mpvCommand(_mpv, mainPtr);
-        foreach (IntPtr ptr in byteArrayPointers)
-        {
-            Marshal.FreeHGlobal(ptr);
-        }
+        var mainPtr = AllocateUtf8IntPtrArrayWithSentinel(args, out var byteArrayPointers);
+        var result = _mpvCommand(_mpv, mainPtr);
+        foreach (var ptr in byteArrayPointers) Marshal.FreeHGlobal(ptr);
 
         Marshal.FreeHGlobal(mainPtr);
         return result;
@@ -865,9 +720,7 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         EnsureNotDisposed();
 
         if (_mpvInitialize == null || _mpvRenderContextCreate == null || _mpvRenderContextSetUpdateCallback == null)
-        {
             throw new InvalidOperationException("MPV delegates not loaded");
-        }
 
         _getProcAddress = getProcAddress;
 
@@ -880,11 +733,8 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         // so let mpv auto-detect from the context it receives.
 
         // Initialize mpv first
-        int err = _mpvInitialize(_mpv);
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = _mpvInitialize(_mpv);
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         // Create OpenGL init params
         var initParams = new MpvOpenGlInitParams
@@ -895,14 +745,14 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             get_proc_address_ctx = IntPtr.Zero
         };
 
-        IntPtr initParamsPtr = Marshal.AllocHGlobal(Marshal.SizeOf<MpvOpenGlInitParams>());
+        var initParamsPtr = Marshal.AllocHGlobal(Marshal.SizeOf<MpvOpenGlInitParams>());
         Marshal.StructureToPtr(initParams, initParamsPtr, false);
 
         try
         {
             // Build render context params
-            byte[] apiTypeBytes = Encoding.UTF8.GetBytes(MPV_RENDER_API_TYPE_OPENGL + "\0");
-            IntPtr apiTypePtr = Marshal.AllocHGlobal(apiTypeBytes.Length);
+            var apiTypeBytes = Encoding.UTF8.GetBytes(MPV_RENDER_API_TYPE_OPENGL + "\0");
+            var apiTypePtr = Marshal.AllocHGlobal(apiTypeBytes.Length);
             Marshal.Copy(apiTypeBytes, 0, apiTypePtr, apiTypeBytes.Length);
 
             var renderParams = new[]
@@ -912,25 +762,22 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 new MpvRenderParam { type = MPV_RENDER_PARAM_INVALID, data = IntPtr.Zero }
             };
 
-            int renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
-            IntPtr renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
+            var renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
+            var renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
 
-            for (int i = 0; i < renderParams.Length; i++)
+            for (var i = 0; i < renderParams.Length; i++)
             {
-                IntPtr offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
+                var offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
                 Marshal.StructureToPtr(renderParams[i], offset, false);
             }
 
             // Create render context
             err = _mpvRenderContextCreate(out _renderContext, _mpv, renderParamsPtr);
-            if (err < 0)
-            {
-                throw new InvalidOperationException(GetErrorString(err));
-            }
+            if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
             // Set update callback
             _renderUpdateCallback = OnRenderUpdate;
-            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(_renderUpdateCallback);
+            var callbackPtr = Marshal.GetFunctionPointerForDelegate(_renderUpdateCallback);
             _mpvRenderContextSetUpdateCallback(_renderContext, callbackPtr, IntPtr.Zero);
 
             // Cleanup
@@ -960,19 +807,14 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         EnsureNotDisposed();
 
         if (_mpvInitialize == null || _mpvRenderContextCreate == null || _mpvRenderContextSetUpdateCallback == null)
-        {
             throw new InvalidOperationException("MPV delegates not loaded");
-        }
 
         // Tell mpv to use the external (libmpv) renderer.
         SetOptionString("vo", "libmpv");
         SetOptionString("gpu-api", "metal");
 
-        int err = _mpvInitialize(_mpv);
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = _mpvInitialize(_mpv);
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         // Build mpv_metal_init_params: device (required) + layer (optional).
         // With a layer set, mpv handles nextDrawable / presentDrawable internally.
@@ -982,13 +824,13 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             layer = metalLayer
         };
 
-        IntPtr initParamsPtr = Marshal.AllocHGlobal(Marshal.SizeOf<MpvMetalInitParams>());
+        var initParamsPtr = Marshal.AllocHGlobal(Marshal.SizeOf<MpvMetalInitParams>());
         Marshal.StructureToPtr(initParams, initParamsPtr, false);
 
         try
         {
-            byte[] apiTypeBytes = Encoding.UTF8.GetBytes(MPV_RENDER_API_TYPE_METAL + "\0");
-            IntPtr apiTypePtr = Marshal.AllocHGlobal(apiTypeBytes.Length);
+            var apiTypeBytes = Encoding.UTF8.GetBytes(MPV_RENDER_API_TYPE_METAL + "\0");
+            var apiTypePtr = Marshal.AllocHGlobal(apiTypeBytes.Length);
             Marshal.Copy(apiTypeBytes, 0, apiTypePtr, apiTypeBytes.Length);
 
             var renderParams = new[]
@@ -998,24 +840,21 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 new MpvRenderParam { type = MPV_RENDER_PARAM_INVALID, data = IntPtr.Zero }
             };
 
-            int renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
-            IntPtr renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
+            var renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
+            var renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
 
-            for (int i = 0; i < renderParams.Length; i++)
+            for (var i = 0; i < renderParams.Length; i++)
             {
-                IntPtr offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
+                var offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
                 Marshal.StructureToPtr(renderParams[i], offset, false);
             }
 
             err = _mpvRenderContextCreate(out _renderContext, _mpv, renderParamsPtr);
-            if (err < 0)
-            {
-                throw new InvalidOperationException(GetErrorString(err));
-            }
+            if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
             // Register the render-update callback so mpv can trigger redraws.
             _renderUpdateCallback = OnRenderUpdate;
-            IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(_renderUpdateCallback);
+            var callbackPtr = Marshal.GetFunctionPointerForDelegate(_renderUpdateCallback);
             _mpvRenderContextSetUpdateCallback(_renderContext, callbackPtr, IntPtr.Zero);
 
             Marshal.FreeHGlobal(renderParamsPtr);
@@ -1038,10 +877,7 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     [SupportedOSPlatform("macos")]
     public void RenderMetal()
     {
-        if (_renderContext == IntPtr.Zero || _mpvRenderContextRender == null)
-        {
-            return;
-        }
+        if (_renderContext == IntPtr.Zero || _mpvRenderContextRender == null) return;
 
         // The layer was provided in init params; mpv manages drawables
         // internally.  An empty (terminator-only) params list is sufficient.
@@ -1050,18 +886,16 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             new MpvRenderParam { type = MPV_RENDER_PARAM_INVALID, data = IntPtr.Zero }
         };
 
-        int renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
-        IntPtr renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
+        var renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
+        var renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
 
         try
         {
             Marshal.StructureToPtr(renderParams[0], renderParamsPtr, false);
 
-            int err = _mpvRenderContextRender(_renderContext, renderParamsPtr);
+            var err = _mpvRenderContextRender(_renderContext, renderParamsPtr);
             if (err < 0 && err != -2) // -2 = MPV_ERROR_NOTHING_TO_RENDER
-            {
                 throw new InvalidOperationException(GetErrorString(err));
-            }
         }
         finally
         {
@@ -1071,10 +905,7 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     public void RenderToFramebuffer(int fbo, int width, int height, bool flipY = true)
     {
-        if (_renderContext == IntPtr.Zero || _mpvRenderContextRender == null)
-        {
-            return;
-        }
+        if (_renderContext == IntPtr.Zero || _mpvRenderContextRender == null) return;
 
         var fboData = new MpvOpenGLFBO
         {
@@ -1084,13 +915,13 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
             internal_format = 0 // 0 = auto-detect
         };
 
-        IntPtr fboPtr = Marshal.AllocHGlobal(Marshal.SizeOf<MpvOpenGLFBO>());
+        var fboPtr = Marshal.AllocHGlobal(Marshal.SizeOf<MpvOpenGLFBO>());
         Marshal.StructureToPtr(fboData, fboPtr, false);
 
         try
         {
-            int flipYValue = flipY ? 1 : 0;
-            IntPtr flipYPtr = Marshal.AllocHGlobal(sizeof(int));
+            var flipYValue = flipY ? 1 : 0;
+            var flipYPtr = Marshal.AllocHGlobal(sizeof(int));
             Marshal.WriteInt32(flipYPtr, flipYValue);
 
             try
@@ -1102,22 +933,20 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                     new MpvRenderParam { type = MPV_RENDER_PARAM_INVALID, data = IntPtr.Zero }
                 };
 
-                int renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
-                IntPtr renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
+                var renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
+                var renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
 
                 try
                 {
-                    for (int i = 0; i < renderParams.Length; i++)
+                    for (var i = 0; i < renderParams.Length; i++)
                     {
-                        IntPtr offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
+                        var offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
                         Marshal.StructureToPtr(renderParams[i], offset, false);
                     }
 
-                    int err = _mpvRenderContextRender(_renderContext, renderParamsPtr);
+                    var err = _mpvRenderContextRender(_renderContext, renderParamsPtr);
                     if (err < 0 && err != -2) // -2 = nothing to render
-                    {
                         throw new InvalidOperationException(GetErrorString(err));
-                    }
                 }
                 finally
                 {
@@ -1137,26 +966,17 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     private void EnsureNotDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(LibMpvDynamicPlayer));
-        }
+        if (_disposed) throw new ObjectDisposedException(nameof(LibMpvDynamicPlayer));
     }
 
     public async Task LoadAudio(string path)
     {
         EnsureNotDisposed();
 
-        int err = await Task.Run(() => DoMpvCommand("loadfile", path));
-        if (_disposed)
-        {
-            return;
-        }
+        var err = await Task.Run(() => DoMpvCommand("loadfile", path));
+        if (_disposed) return;
 
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         SetOptionString("keep-open", "always");
         SetOptionString("sid", "no");
@@ -1169,20 +989,14 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     private bool IsEofReached()
     {
-        if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null)
-        {
-            return false;
-        }
+        if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null) return false;
 
         try
         {
             double eofValue = 0;
-            byte[] nameBytes = GetUtf8Bytes("eof-reached");
-            int err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_FLAG, ref eofValue);
-            if (err < 0)
-            {
-                return false;
-            }
+            var nameBytes = GetUtf8Bytes("eof-reached");
+            var err = _mpvGetPropertyDouble(_mpv, nameBytes, MPV_FORMAT_FLAG, ref eofValue);
+            if (err < 0) return false;
 
             return eofValue != 0;
         }
@@ -1196,32 +1010,20 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     {
         _pausedValue = null;
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
-        int err = DoMpvCommand("frame-step");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("frame-step");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
     }
 
     public void StepOneFrameBack()
     {
         _pausedValue = null;
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
-        int err = DoMpvCommand("frame-back-step");
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("frame-back-step");
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
     }
 
     public List<AudioTrackInfo> GetAudioTracks()
@@ -1230,52 +1032,38 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
         EnsureNotDisposed();
         if (_mpv == IntPtr.Zero || _mpvGetPropertyDouble == null || _mpvGetPropertyString == null || _mpvFree == null)
-        {
             return audioTracks;
-        }
 
         try
         {
             // Get track list count
             double trackCount = 0;
-            byte[] trackCountBytes = GetUtf8Bytes("track-list/count");
-            int err = _mpvGetPropertyDouble(_mpv, trackCountBytes, MPV_FORMAT_DOUBLE, ref trackCount);
+            var trackCountBytes = GetUtf8Bytes("track-list/count");
+            var err = _mpvGetPropertyDouble(_mpv, trackCountBytes, MPV_FORMAT_DOUBLE, ref trackCount);
 
-            if (err < 0 || trackCount <= 0)
-            {
-                return audioTracks;
-            }
+            if (err < 0 || trackCount <= 0) return audioTracks;
 
             // Iterate through tracks to find audio tracks
-            for (int i = 0; i < (int)trackCount; i++)
+            for (var i = 0; i < (int)trackCount; i++)
             {
                 // Get track type
-                IntPtr typePtr = IntPtr.Zero;
-                byte[] typeBytes = GetUtf8Bytes($"track-list/{i}/type");
+                var typePtr = IntPtr.Zero;
+                var typeBytes = GetUtf8Bytes($"track-list/{i}/type");
                 err = _mpvGetPropertyString(_mpv, typeBytes, MPV_FORMAT_STRING, ref typePtr);
 
-                if (err < 0 || typePtr == IntPtr.Zero)
-                {
-                    continue;
-                }
+                if (err < 0 || typePtr == IntPtr.Zero) continue;
 
-                string? type = Marshal.PtrToStringUTF8(typePtr);
+                var type = Marshal.PtrToStringUTF8(typePtr);
                 _mpvFree(typePtr);
 
-                if (!string.Equals(type, "audio", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
+                if (!string.Equals(type, "audio", StringComparison.OrdinalIgnoreCase)) continue;
 
                 // Get track ID
                 double trackId = -1;
-                byte[] idBytes = GetUtf8Bytes($"track-list/{i}/id");
+                var idBytes = GetUtf8Bytes($"track-list/{i}/id");
                 err = _mpvGetPropertyDouble(_mpv, idBytes, MPV_FORMAT_DOUBLE, ref trackId);
 
-                if (err < 0 || trackId < 0)
-                {
-                    continue;
-                }
+                if (err < 0 || trackId < 0) continue;
 
                 var trackInfo = new AudioTrackInfo
                 {
@@ -1283,8 +1071,8 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 };
 
                 // Get track language (optional)
-                IntPtr langPtr = IntPtr.Zero;
-                byte[] langBytes = GetUtf8Bytes($"track-list/{i}/lang");
+                var langPtr = IntPtr.Zero;
+                var langBytes = GetUtf8Bytes($"track-list/{i}/lang");
                 err = _mpvGetPropertyString(_mpv, langBytes, MPV_FORMAT_STRING, ref langPtr);
 
                 if (err >= 0 && langPtr != IntPtr.Zero)
@@ -1294,8 +1082,8 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 }
 
                 // Get track title (optional)
-                IntPtr titlePtr = IntPtr.Zero;
-                byte[] titleBytes = GetUtf8Bytes($"track-list/{i}/title");
+                var titlePtr = IntPtr.Zero;
+                var titleBytes = GetUtf8Bytes($"track-list/{i}/title");
                 err = _mpvGetPropertyString(_mpv, titleBytes, MPV_FORMAT_STRING, ref titlePtr);
 
                 if (err >= 0 && titlePtr != IntPtr.Zero)
@@ -1306,17 +1094,14 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
                 // Get track ff-index (optional)
                 double ffIndex = -1;
-                byte[] ffIndexBytes = GetUtf8Bytes($"track-list/{i}/ff-index");
+                var ffIndexBytes = GetUtf8Bytes($"track-list/{i}/ff-index");
                 err = _mpvGetPropertyDouble(_mpv, ffIndexBytes, MPV_FORMAT_DOUBLE, ref ffIndex);
 
-                if (err >= 0 && ffIndex >= 0)
-                {
-                    trackInfo.FfIndex = (int)ffIndex;
-                }
+                if (err >= 0 && ffIndex >= 0) trackInfo.FfIndex = (int)ffIndex;
 
                 // Get track selected status
                 double selectedValue = 0;
-                byte[] selectedBytes = GetUtf8Bytes($"track-list/{i}/selected");
+                var selectedBytes = GetUtf8Bytes($"track-list/{i}/selected");
                 err = _mpvGetPropertyDouble(_mpv, selectedBytes, MPV_FORMAT_FLAG, ref selectedValue);
 
                 trackInfo.IsSelected = err >= 0 && selectedValue == 1;
@@ -1335,16 +1120,10 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
     public void SetAudioTrack(int trackId)
     {
         EnsureNotDisposed();
-        if (_mpv == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_mpv == IntPtr.Zero) return;
 
-        int err = DoMpvCommand("set", "aid", trackId.ToString(CultureInfo.InvariantCulture));
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = DoMpvCommand("set", "aid", trackId.ToString(CultureInfo.InvariantCulture));
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
     }
 
     public void InitializeWithSoftwareRendering()
@@ -1356,20 +1135,15 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
         SetOptionString("vo", "libmpv");
 
         if (_mpvInitialize == null || _mpvRenderContextCreate == null || _mpvRenderContextSetUpdateCallback == null)
-        {
             throw new InvalidOperationException("MPV delegates not loaded for software rendering.");
-        }
 
         // Initialize mpv
-        int err = _mpvInitialize(_mpv);
-        if (err < 0)
-        {
-            throw new InvalidOperationException(GetErrorString(err));
-        }
+        var err = _mpvInitialize(_mpv);
+        if (err < 0) throw new InvalidOperationException(GetErrorString(err));
 
         // Build render context params for software rendering
-        byte[] apiTypeBytes = Encoding.UTF8.GetBytes(MPV_RENDER_API_TYPE_SW + "\0");
-        IntPtr apiTypePtr = Marshal.AllocHGlobal(apiTypeBytes.Length);
+        var apiTypeBytes = Encoding.UTF8.GetBytes(MPV_RENDER_API_TYPE_SW + "\0");
+        var apiTypePtr = Marshal.AllocHGlobal(apiTypeBytes.Length);
         Marshal.Copy(apiTypeBytes, 0, apiTypePtr, apiTypeBytes.Length);
 
         try
@@ -1380,27 +1154,26 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                 new MpvRenderParam { type = MPV_RENDER_PARAM_INVALID, data = IntPtr.Zero }
             };
 
-            int renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
-            IntPtr renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
+            var renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
+            var renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
 
             try
             {
-                for (int i = 0; i < renderParams.Length; i++)
+                for (var i = 0; i < renderParams.Length; i++)
                 {
-                    IntPtr offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
+                    var offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
                     Marshal.StructureToPtr(renderParams[i], offset, false);
                 }
 
                 // Create render context
                 err = _mpvRenderContextCreate(out _renderContext, _mpv, renderParamsPtr);
                 if (err < 0)
-                {
-                    throw new InvalidOperationException($"Failed to create software render context: {GetErrorString(err)}");
-                }
+                    throw new InvalidOperationException(
+                        $"Failed to create software render context: {GetErrorString(err)}");
 
                 // Set update callback
                 _renderUpdateCallback = OnRenderUpdate;
-                IntPtr callbackPtr = Marshal.GetFunctionPointerForDelegate(_renderUpdateCallback);
+                var callbackPtr = Marshal.GetFunctionPointerForDelegate(_renderUpdateCallback);
                 _mpvRenderContextSetUpdateCallback(_renderContext, callbackPtr, IntPtr.Zero);
             }
             finally
@@ -1416,42 +1189,32 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
 
     public void SoftwareRender(int width, int height, IntPtr surfaceAddress, string format)
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
 
-        if (_renderContext == IntPtr.Zero || _mpvRenderContextRender == null)
-        {
-            return;
-        }
+        if (_renderContext == IntPtr.Zero || _mpvRenderContextRender == null) return;
 
         Debug.WriteLine($"SoftwareRender: width={width}, height={height}, format={format}, address={surfaceAddress}");
 
         unsafe
         {
-            int[] size = new[] { width, height };
+            var size = new[] { width, height };
             // MPV_RENDER_PARAM_SW_STRIDE expects a pointer to size_t
             // size_t is platform-specific: 4 bytes on 32-bit, 8 bytes on 64-bit
             // nuint (native uint) is the C# equivalent of size_t
-            nuint stride = (nuint)(width * 4);
+            var stride = (nuint)(width * 4);
 
             fixed (int* sizePtr = size)
             {
-                byte[] formatBytes = Encoding.UTF8.GetBytes(format + "\0");
-                IntPtr formatPtr = Marshal.AllocHGlobal(formatBytes.Length);
+                var formatBytes = Encoding.UTF8.GetBytes(format + "\0");
+                var formatPtr = Marshal.AllocHGlobal(formatBytes.Length);
                 Marshal.Copy(formatBytes, 0, formatPtr, formatBytes.Length);
 
                 // Allocate and write the stride value (size_t)
-                IntPtr stridePtr = Marshal.AllocHGlobal(IntPtr.Size);
+                var stridePtr = Marshal.AllocHGlobal(IntPtr.Size);
                 if (IntPtr.Size == 8) // 64-bit
-                {
                     *(ulong*)stridePtr = stride;
-                }
                 else // 32-bit
-                {
                     *(uint*)stridePtr = (uint)stride;
-                }
 
                 try
                 {
@@ -1464,26 +1227,21 @@ public sealed class LibMpvDynamicPlayer : IDisposable, IVideoPlayer
                         new MpvRenderParam { type = MPV_RENDER_PARAM_INVALID, data = IntPtr.Zero }
                     };
 
-                    int renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
-                    IntPtr renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
+                    var renderParamsSize = Marshal.SizeOf<MpvRenderParam>() * renderParams.Length;
+                    var renderParamsPtr = Marshal.AllocHGlobal(renderParamsSize);
 
                     try
                     {
-                        for (int i = 0; i < renderParams.Length; i++)
+                        for (var i = 0; i < renderParams.Length; i++)
                         {
-                            IntPtr offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
+                            var offset = renderParamsPtr + i * Marshal.SizeOf<MpvRenderParam>();
                             Marshal.StructureToPtr(renderParams[i], offset, false);
                         }
 
-                        int err = _mpvRenderContextRender(_renderContext, renderParamsPtr);
+                        var err = _mpvRenderContextRender(_renderContext, renderParamsPtr);
                         if (err < 0 && err != -2) // -2 = nothing to render
-                        {
                             Debug.WriteLine($"Software render failed: {GetErrorString(err)} (code: {err})");
-                        }
-                        else if (err == 0)
-                        {
-                            Debug.WriteLine("Software render SUCCESS");
-                        }
+                        else if (err == 0) Debug.WriteLine("Software render SUCCESS");
                     }
                     finally
                     {

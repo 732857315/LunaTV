@@ -1,10 +1,10 @@
-using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using SkiaSharp;
 
-namespace LunaTV.Utils;
+namespace LunaTV.LibMPV2;
 
 public class RunLengthTwoParts
 {
@@ -38,14 +38,11 @@ public class NikseBitmap
 
     public NikseBitmap(SKBitmap inputBitmap)
     {
-        if (inputBitmap == null)
-        {
-            return;
-        }
+        if (inputBitmap == null) return;
 
         Width = inputBitmap.Width;
         Height = inputBitmap.Height;
-        bool createdNewBitmap = false;
+        var createdNewBitmap = false;
         if (inputBitmap.ColorType != SKColorType.Bgra8888)
         {
             var info = new SKImageInfo(inputBitmap.Width, inputBitmap.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
@@ -54,19 +51,17 @@ public class NikseBitmap
             {
                 canvas.DrawBitmap(inputBitmap, 0, 0);
             }
+
             inputBitmap = newBitmap;
             createdNewBitmap = true;
         }
 
         // Copy pixel data from SKBitmap.
-        int byteCount = inputBitmap.ByteCount;
+        var byteCount = inputBitmap.ByteCount;
         _bitmapData = new byte[byteCount];
         // GetPixels returns pointer to the underlying byte array.
         Marshal.Copy(inputBitmap.GetPixels(), _bitmapData, 0, byteCount);
-        if (createdNewBitmap)
-        {
-            inputBitmap.Dispose();
-        }
+        if (createdNewBitmap) inputBitmap.Dispose();
     }
 
     public NikseBitmap(NikseBitmap input)
@@ -91,45 +86,37 @@ public class NikseBitmap
 
     public void ReplaceYellowWithWhite()
     {
-        byte[] buffer = new byte[3];
+        var buffer = new byte[3];
         buffer[0] = 255;
         buffer[1] = 255;
         buffer[2] = 255;
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] > 200 && // Alpha
                 _bitmapData[i + 2] > 199 && // Red
                 _bitmapData[i + 1] > 190 && // Green
-                _bitmapData[i] < 40)        // Blue
-            {
+                _bitmapData[i] < 40) // Blue
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 3);
-            }
-        }
     }
 
     public void ReplaceColor(int alpha, int red, int green, int blue,
         int alphaTo, int redTo, int greenTo, int blueTo)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = (byte)blueTo;
         buffer[1] = (byte)greenTo;
         buffer[2] = (byte)redTo;
         buffer[3] = (byte)alphaTo;
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] == alpha &&
                 _bitmapData[i + 2] == red &&
                 _bitmapData[i + 1] == green &&
                 _bitmapData[i] == blue)
-            {
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void InvertColors()
     {
-        for (int i = 0; i < _bitmapData.Length;)
+        for (var i = 0; i < _bitmapData.Length;)
         {
             _bitmapData[i] = (byte)~_bitmapData[i];
             i++;
@@ -142,61 +129,48 @@ public class NikseBitmap
 
     public void ReplaceNonWhiteWithTransparent()
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = 0; // B
         buffer[1] = 0; // G
         buffer[2] = 0; // R
         buffer[3] = 0; // A
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 2] + _bitmapData[i + 1] + _bitmapData[i] < 300)
-            {
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void ReplaceTransparentWith(SKColor c)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = c.Blue;
         buffer[1] = c.Green;
         buffer[2] = c.Red;
         buffer[3] = c.Alpha;
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] < 10)
-            {
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void MakeOneColor(SKColor c)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = c.Blue;
         buffer[1] = c.Green;
         buffer[2] = c.Red;
         buffer[3] = c.Alpha;
 
-        byte[] bufferTransparent = new byte[4];
+        var bufferTransparent = new byte[4];
         bufferTransparent[0] = 0;
         bufferTransparent[1] = 0;
         bufferTransparent[2] = 0;
         bufferTransparent[3] = 0;
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             Buffer.BlockCopy(_bitmapData[i] > 20 ? buffer : bufferTransparent, 0, _bitmapData, i, 4);
-        }
     }
 
     private static SKColor GetOutlineColor(SKColor borderColor)
     {
-        if (borderColor.Red + borderColor.Green + borderColor.Blue < 30)
-        {
-            return new SKColor(75, 75, 75, 200);
-        }
+        if (borderColor.Red + borderColor.Green + borderColor.Blue < 30) return new SKColor(75, 75, 75, 200);
 
         return new SKColor(borderColor.Red, borderColor.Green, borderColor.Blue, 150);
     }
@@ -210,26 +184,26 @@ public class NikseBitmap
     /// <param name="useInnerAntialize"></param>
     public SKColor ConvertToFourColors(SKColor background, SKColor pattern, SKColor emphasis1, bool useInnerAntialize)
     {
-        byte[] backgroundBuffer = new byte[4];
+        var backgroundBuffer = new byte[4];
         backgroundBuffer[0] = background.Blue;
         backgroundBuffer[1] = background.Green;
         backgroundBuffer[2] = background.Red;
         backgroundBuffer[3] = background.Alpha;
 
-        byte[] patternBuffer = new byte[4];
+        var patternBuffer = new byte[4];
         patternBuffer[0] = pattern.Blue;
         patternBuffer[1] = pattern.Green;
         patternBuffer[2] = pattern.Red;
         patternBuffer[3] = pattern.Alpha;
 
-        byte[] emphasis1Buffer = new byte[4];
+        var emphasis1Buffer = new byte[4];
         emphasis1Buffer[0] = emphasis1.Blue;
         emphasis1Buffer[1] = emphasis1.Green;
         emphasis1Buffer[2] = emphasis1.Red;
         emphasis1Buffer[3] = emphasis1.Alpha;
 
-        byte[] emphasis2Buffer = new byte[4];
-        SKColor emphasis2 = GetOutlineColor(emphasis1);
+        var emphasis2Buffer = new byte[4];
+        var emphasis2 = GetOutlineColor(emphasis1);
         if (!useInnerAntialize)
         {
             emphasis2Buffer[0] = emphasis2.Blue;
@@ -238,16 +212,16 @@ public class NikseBitmap
             emphasis2Buffer[3] = emphasis2.Alpha;
         }
 
-        for (int i = 0; i < _bitmapData.Length; i += 4)
+        for (var i = 0; i < _bitmapData.Length; i += 4)
         {
-            int smallestDiff = 10000;
-            byte[] buffer = backgroundBuffer;
+            var smallestDiff = 10000;
+            var buffer = backgroundBuffer;
             if (backgroundBuffer[3] == 0 && _bitmapData[i + 3] < 10) // transparent
             {
             }
             else
             {
-                int patternDiff = Math.Abs(patternBuffer[0] - _bitmapData[i]) +
+                var patternDiff = Math.Abs(patternBuffer[0] - _bitmapData[i]) +
                                   Math.Abs(patternBuffer[1] - _bitmapData[i + 1]) +
                                   Math.Abs(patternBuffer[2] - _bitmapData[i + 2]) +
                                   Math.Abs(patternBuffer[3] - _bitmapData[i + 3]);
@@ -257,16 +231,13 @@ public class NikseBitmap
                     buffer = patternBuffer;
                 }
 
-                int emphasis1Diff = Math.Abs(emphasis1Buffer[0] - _bitmapData[i]) +
+                var emphasis1Diff = Math.Abs(emphasis1Buffer[0] - _bitmapData[i]) +
                                     Math.Abs(emphasis1Buffer[1] - _bitmapData[i + 1]) +
                                     Math.Abs(emphasis1Buffer[2] - _bitmapData[i + 2]) +
                                     Math.Abs(emphasis1Buffer[3] - _bitmapData[i + 3]);
                 if (useInnerAntialize)
                 {
-                    if (emphasis1Diff - 20 < smallestDiff)
-                    {
-                        buffer = emphasis1Buffer;
-                    }
+                    if (emphasis1Diff - 20 < smallestDiff) buffer = emphasis1Buffer;
                 }
                 else
                 {
@@ -276,100 +247,83 @@ public class NikseBitmap
                         buffer = emphasis1Buffer;
                     }
 
-                    int emphasis2Diff = Math.Abs(emphasis2Buffer[0] - _bitmapData[i]) +
+                    var emphasis2Diff = Math.Abs(emphasis2Buffer[0] - _bitmapData[i]) +
                                         Math.Abs(emphasis2Buffer[1] - _bitmapData[i + 1]) +
                                         Math.Abs(emphasis2Buffer[2] - _bitmapData[i + 2]) +
                                         Math.Abs(emphasis2Buffer[3] - _bitmapData[i + 3]);
                     if (emphasis2Diff < smallestDiff)
-                    {
                         buffer = emphasis2Buffer;
-                    }
                     else if (_bitmapData[i + 3] >= 10 && _bitmapData[i + 3] < 90) // anti-alias
-                    {
                         buffer = emphasis2Buffer;
-                    }
                 }
             }
+
             Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
         }
 
-        if (useInnerAntialize)
-        {
-            return VobSubAntialize(pattern, emphasis1);
-        }
+        if (useInnerAntialize) return VobSubAntialize(pattern, emphasis1);
 
         return emphasis2;
     }
 
     private SKColor VobSubAntialize(SKColor pattern, SKColor emphasis1)
     {
-        int r = (int)Math.Round((pattern.Red * 2.0 + emphasis1.Red) / 3.0);
-        int g = (int)Math.Round((pattern.Green * 2.0 + emphasis1.Green) / 3.0);
-        int b = (int)Math.Round((pattern.Blue * 2.0 + emphasis1.Blue) / 3.0);
+        var r = (int)Math.Round((pattern.Red * 2.0 + emphasis1.Red) / 3.0);
+        var g = (int)Math.Round((pattern.Green * 2.0 + emphasis1.Green) / 3.0);
+        var b = (int)Math.Round((pattern.Blue * 2.0 + emphasis1.Blue) / 3.0);
         var antializeColor = new SKColor((byte)r, (byte)g, (byte)b, 255);
 
-        for (int y = 1; y < Height - 1; y++)
-        {
-            for (int x = 1; x < Width - 1; x++)
+        for (var y = 1; y < Height - 1; y++)
+        for (var x = 1; x < Width - 1; x++)
+            if (GetPixel(x, y).Equals(pattern))
             {
-                if (GetPixel(x, y).Equals(pattern))
-                {
-                    if (GetPixel(x - 1, y).Equals(emphasis1) && GetPixel(x, y - 1).Equals(emphasis1))
-                    {
-                        SetPixel(x, y, antializeColor);
-                    }
-                    else if (GetPixel(x - 1, y).Equals(emphasis1) && GetPixel(x, y + 1).Equals(emphasis1))
-                    {
-                        SetPixel(x, y, antializeColor);
-                    }
-                    else if (GetPixel(x + 1, y).Equals(emphasis1) && GetPixel(x, y + 1).Equals(emphasis1))
-                    {
-                        SetPixel(x, y, antializeColor);
-                    }
-                    else if (GetPixel(x + 1, y).Equals(emphasis1) && GetPixel(x, y - 1).Equals(emphasis1))
-                    {
-                        SetPixel(x, y, antializeColor);
-                    }
-                }
+                if (GetPixel(x - 1, y).Equals(emphasis1) && GetPixel(x, y - 1).Equals(emphasis1))
+                    SetPixel(x, y, antializeColor);
+                else if (GetPixel(x - 1, y).Equals(emphasis1) && GetPixel(x, y + 1).Equals(emphasis1))
+                    SetPixel(x, y, antializeColor);
+                else if (GetPixel(x + 1, y).Equals(emphasis1) && GetPixel(x, y + 1).Equals(emphasis1))
+                    SetPixel(x, y, antializeColor);
+                else if (GetPixel(x + 1, y).Equals(emphasis1) && GetPixel(x, y - 1).Equals(emphasis1))
+                    SetPixel(x, y, antializeColor);
             }
-        }
 
         return antializeColor;
     }
 
-    public RunLengthTwoParts RunLengthEncodeForDvd(SKColor background, SKColor pattern, SKColor emphasis1, SKColor emphasis2)
+    public RunLengthTwoParts RunLengthEncodeForDvd(SKColor background, SKColor pattern, SKColor emphasis1,
+        SKColor emphasis2)
     {
-        byte[] backgroundBuffer = new byte[4];
+        var backgroundBuffer = new byte[4];
         backgroundBuffer[0] = background.Blue;
         backgroundBuffer[1] = background.Green;
         backgroundBuffer[2] = background.Red;
         backgroundBuffer[3] = background.Alpha;
 
-        byte[] patternBuffer = new byte[4];
+        var patternBuffer = new byte[4];
         patternBuffer[0] = pattern.Blue;
         patternBuffer[1] = pattern.Green;
         patternBuffer[2] = pattern.Red;
         patternBuffer[3] = pattern.Alpha;
 
-        byte[] emphasis1Buffer = new byte[4];
+        var emphasis1Buffer = new byte[4];
         emphasis1Buffer[0] = emphasis1.Blue;
         emphasis1Buffer[1] = emphasis1.Green;
         emphasis1Buffer[2] = emphasis1.Red;
         emphasis1Buffer[3] = emphasis1.Alpha;
 
-        byte[] emphasis2Buffer = new byte[4];
+        var emphasis2Buffer = new byte[4];
         emphasis2Buffer[0] = emphasis2.Blue;
         emphasis2Buffer[1] = emphasis2.Green;
         emphasis2Buffer[2] = emphasis2.Red;
         emphasis2Buffer[3] = emphasis2.Alpha;
 
-        byte[] bufferEqual = new byte[Width * Height];
-        byte[] bufferUnEqual = new byte[Width * Height];
-        int indexBufferEqual = 0;
-        int indexBufferUnEqual = 0;
+        var bufferEqual = new byte[Width * Height];
+        var bufferUnEqual = new byte[Width * Height];
+        var indexBufferEqual = 0;
+        var indexBufferUnEqual = 0;
 
         _pixelAddress = -4;
-        for (int y = 0; y < Height; y++)
+        for (var y = 0; y < Height; y++)
         {
             int index;
             byte[] buffer;
@@ -384,20 +338,22 @@ public class NikseBitmap
                 buffer = bufferUnEqual;
             }
 
-            bool indexHalfNibble = false;
-            int lastColor = -1;
-            int count = 0;
+            var indexHalfNibble = false;
+            var lastColor = -1;
+            var count = 0;
 
-            for (int x = 0; x < Width; x++)
+            for (var x = 0; x < Width; x++)
             {
-                int color = GetDvdColor(patternBuffer, emphasis1Buffer, emphasis2Buffer);
+                var color = GetDvdColor(patternBuffer, emphasis1Buffer, emphasis2Buffer);
 
                 if (lastColor == -1)
                 {
                     lastColor = color;
                     count = 1;
                 }
-                else if (lastColor == color && count < 64) // only allow up to 63 run-length (for SubtitleCreator compatibility)
+                else if
+                    (lastColor == color &&
+                     count < 64) // only allow up to 63 run-length (for SubtitleCreator compatibility)
                 {
                     count++;
                 }
@@ -409,15 +365,9 @@ public class NikseBitmap
                 }
             }
 
-            if (count > 0)
-            {
-                WriteRle(ref indexHalfNibble, lastColor, count, ref index, buffer);
-            }
+            if (count > 0) WriteRle(ref indexHalfNibble, lastColor, count, ref index, buffer);
 
-            if (indexHalfNibble)
-            {
-                index++;
-            }
+            if (indexHalfNibble) index++;
 
             if (y % 2 == 0)
             {
@@ -454,38 +404,32 @@ public class NikseBitmap
         }
         else // 64-255 repetitions
         {
-            int factor = count / 255;
-            for (int i = 0; i < factor; i++)
-            {
-                WriteFourNibbles(buffer, 0xff, lastColor, ref index, indexHalfNibble);
-            }
+            var factor = count / 255;
+            for (var i = 0; i < factor; i++) WriteFourNibbles(buffer, 0xff, lastColor, ref index, indexHalfNibble);
 
-            int rest = count % 255;
-            if (rest > 0)
-            {
-                WriteFourNibbles(buffer, rest, lastColor, ref index, indexHalfNibble);
-            }
+            var rest = count % 255;
+            if (rest > 0) WriteFourNibbles(buffer, rest, lastColor, ref index, indexHalfNibble);
         }
     }
 
     private static void WriteFourNibbles(byte[] buffer, int count, int color, ref int index, bool indexHalfNibble)
     {
-        int n = (count << 2) + color;
+        var n = (count << 2) + color;
         if (indexHalfNibble)
         {
             index++;
-            byte firstNibble = (byte)(n >> 4);
+            var firstNibble = (byte)(n >> 4);
             buffer[index] = firstNibble;
             index++;
-            byte secondNibble = (byte)((n & 0b00001111) << 4);
+            var secondNibble = (byte)((n & 0b00001111) << 4);
             buffer[index] = secondNibble;
         }
         else
         {
-            byte firstNibble = (byte)(n >> 8);
+            var firstNibble = (byte)(n >> 8);
             buffer[index] = firstNibble;
             index++;
-            byte secondNibble = (byte)(n & 0b11111111);
+            var secondNibble = (byte)(n & 0b11111111);
             buffer[index] = secondNibble;
             index++;
         }
@@ -495,7 +439,7 @@ public class NikseBitmap
     {
         //Value     Bits   n=length, c=color
         //16-63     12     0 0 0 0 n n n n n n c c           (one and a half byte)
-        ushort n = (ushort)((count << 2) + color);
+        var n = (ushort)((count << 2) + color);
         if (indexHalfNibble)
         {
             index++; // there should already zeroes in last nibble
@@ -516,12 +460,12 @@ public class NikseBitmap
     {
         //Value      Bits   n=length, c=color
         //4-15       8      0 0 n n n n c c                   (one byte)
-        byte n = (byte)((count << 2) + color);
+        var n = (byte)((count << 2) + color);
         if (indexHalfNibble)
         {
-            byte firstNibble = (byte)(n >> 4);
+            var firstNibble = (byte)(n >> 4);
             buffer[index] = (byte)(buffer[index] | firstNibble);
-            byte secondNibble = (byte)((n & 0b00001111) << 4);
+            var secondNibble = (byte)((n & 0b00001111) << 4);
             index++;
             buffer[index] = secondNibble;
         }
@@ -534,7 +478,7 @@ public class NikseBitmap
 
     private static void WriteOneNibble(byte[] buffer, int count, int color, ref int index, ref bool indexHalfNibble)
     {
-        byte n = (byte)((count << 2) + color);
+        var n = (byte)((count << 2) + color);
         if (indexHalfNibble)
         {
             buffer[index] = (byte)(buffer[index] | n);
@@ -556,49 +500,34 @@ public class NikseBitmap
         int g = _bitmapData[_pixelAddress + 1];
         int b = _bitmapData[_pixelAddress];
 
-        if (pattern[0] == b && pattern[1] == g && pattern[2] == r && pattern[3] == a)
-        {
-            return 1;
-        }
+        if (pattern[0] == b && pattern[1] == g && pattern[2] == r && pattern[3] == a) return 1;
 
-        if (emphasis1[0] == b && emphasis1[1] == g && emphasis1[2] == r && emphasis1[3] == a)
-        {
-            return 2;
-        }
+        if (emphasis1[0] == b && emphasis1[1] == g && emphasis1[2] == r && emphasis1[3] == a) return 2;
 
-        if (emphasis2[0] == b && emphasis2[1] == g && emphasis2[2] == r && emphasis2[3] == a)
-        {
-            return 3;
-        }
+        if (emphasis2[0] == b && emphasis2[1] == g && emphasis2[2] == r && emphasis2[3] == a) return 3;
 
         return 0;
     }
 
     public int CropTransparentSidesAndBottom(int maximumCropping, bool bottom)
     {
-        int leftStart = 0;
-        bool done = false;
-        int x = 0;
+        var leftStart = 0;
+        var done = false;
+        var x = 0;
         int y;
         while (!done && x < Width)
         {
             y = 0;
             while (!done && y < Height)
             {
-                int alpha = GetAlpha(x, y);
+                var alpha = GetAlpha(x, y);
                 if (alpha != 0)
                 {
                     done = true;
                     leftStart = x;
-                    if (leftStart > maximumCropping)
-                    {
-                        leftStart -= maximumCropping;
-                    }
+                    if (leftStart > maximumCropping) leftStart -= maximumCropping;
 
-                    if (leftStart < 0)
-                    {
-                        leftStart = 0;
-                    }
+                    if (leftStart < 0) leftStart = 0;
                 }
 
                 y++;
@@ -607,7 +536,7 @@ public class NikseBitmap
             x++;
         }
 
-        int rightEnd = Width - 1;
+        var rightEnd = Width - 1;
         done = false;
         x = Width - 1;
         while (!done && x >= 0)
@@ -615,20 +544,14 @@ public class NikseBitmap
             y = 0;
             while (!done && y < Height)
             {
-                int alpha = GetAlpha(x, y);
+                var alpha = GetAlpha(x, y);
                 if (alpha != 0)
                 {
                     done = true;
                     rightEnd = x;
-                    if (Width - rightEnd > maximumCropping)
-                    {
-                        rightEnd += maximumCropping;
-                    }
+                    if (Width - rightEnd > maximumCropping) rightEnd += maximumCropping;
 
-                    if (rightEnd >= Width)
-                    {
-                        rightEnd = Width - 1;
-                    }
+                    if (rightEnd >= Width) rightEnd = Width - 1;
                 }
 
                 y++;
@@ -639,7 +562,7 @@ public class NikseBitmap
 
         //crop bottom
         done = false;
-        int newHeight = Height;
+        var newHeight = Height;
         if (bottom)
         {
             y = Height - 1;
@@ -648,15 +571,12 @@ public class NikseBitmap
                 x = 0;
                 while (!done && x < Width)
                 {
-                    int alpha = GetAlpha(x, y);
+                    var alpha = GetAlpha(x, y);
                     if (alpha != 0)
                     {
                         done = true;
                         newHeight = y + maximumCropping + 1;
-                        if (newHeight > Height)
-                        {
-                            newHeight = Height;
-                        }
+                        if (newHeight > Height) newHeight = Height;
                     }
 
                     x++;
@@ -666,23 +586,17 @@ public class NikseBitmap
             }
         }
 
-        if (leftStart < 2 && rightEnd >= Width - 3)
-        {
-            return 0;
-        }
+        if (leftStart < 2 && rightEnd >= Width - 3) return 0;
 
-        int newWidth = rightEnd - leftStart + 1;
-        if (newWidth <= 0)
-        {
-            return 0;
-        }
+        var newWidth = rightEnd - leftStart + 1;
+        if (newWidth <= 0) return 0;
 
-        byte[] newBitmapData = new byte[newWidth * newHeight * 4];
-        int index = 0;
-        int newWidthX4 = 4 * newWidth;
+        var newBitmapData = new byte[newWidth * newHeight * 4];
+        var index = 0;
+        var newWidthX4 = 4 * newWidth;
         for (y = 0; y < newHeight; y++)
         {
-            int pixelAddress = leftStart * 4 + y * _widthX4;
+            var pixelAddress = leftStart * 4 + y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, newWidthX4);
             index += newWidthX4;
         }
@@ -696,25 +610,22 @@ public class NikseBitmap
     /// <returns>Pixels cropped left</returns>
     public int CropSidesAndBottom(int maximumCropping, SKColor transparentColor, bool bottom)
     {
-        int leftStart = 0;
-        bool done = false;
-        int x = 0;
+        var leftStart = 0;
+        var done = false;
+        var x = 0;
         int y;
         while (!done && x < Width)
         {
             y = 0;
             while (!done && y < Height)
             {
-                SKColor c = GetPixel(x, y);
+                var c = GetPixel(x, y);
                 if (!c.Equals(transparentColor))
                 {
                     done = true;
                     leftStart = x;
                     leftStart -= maximumCropping;
-                    if (leftStart < 0)
-                    {
-                        leftStart = 0;
-                    }
+                    if (leftStart < 0) leftStart = 0;
                 }
 
                 y++;
@@ -723,7 +634,7 @@ public class NikseBitmap
             x++;
         }
 
-        int rightEnd = Width - 1;
+        var rightEnd = Width - 1;
         done = false;
         x = Width - 1;
         while (!done && x >= 0)
@@ -731,16 +642,13 @@ public class NikseBitmap
             y = 0;
             while (!done && y < Height)
             {
-                SKColor c = GetPixel(x, y);
+                var c = GetPixel(x, y);
                 if (!c.Equals(transparentColor))
                 {
                     done = true;
                     rightEnd = x;
                     rightEnd += maximumCropping;
-                    if (rightEnd >= Width)
-                    {
-                        rightEnd = Width - 1;
-                    }
+                    if (rightEnd >= Width) rightEnd = Width - 1;
                 }
 
                 y++;
@@ -751,7 +659,7 @@ public class NikseBitmap
 
         //crop bottom
         done = false;
-        int newHeight = Height;
+        var newHeight = Height;
         if (bottom)
         {
             y = Height - 1;
@@ -760,15 +668,12 @@ public class NikseBitmap
                 x = 0;
                 while (!done && x < Width)
                 {
-                    SKColor c = GetPixel(x, y);
+                    var c = GetPixel(x, y);
                     if (!c.Equals(transparentColor))
                     {
                         done = true;
                         newHeight = y + maximumCropping;
-                        if (newHeight > Height)
-                        {
-                            newHeight = Height;
-                        }
+                        if (newHeight > Height) newHeight = Height;
                     }
 
                     x++;
@@ -778,23 +683,17 @@ public class NikseBitmap
             }
         }
 
-        if (leftStart < 2 && rightEnd >= Width - 3)
-        {
-            return 0;
-        }
+        if (leftStart < 2 && rightEnd >= Width - 3) return 0;
 
-        int newWidth = rightEnd - leftStart + 1;
-        if (newWidth <= 0)
-        {
-            return 0;
-        }
+        var newWidth = rightEnd - leftStart + 1;
+        if (newWidth <= 0) return 0;
 
-        byte[] newBitmapData = new byte[newWidth * newHeight * 4];
-        int index = 0;
-        int newWidthX4 = 4 * newWidth;
+        var newBitmapData = new byte[newWidth * newHeight * 4];
+        var index = 0;
+        var newWidthX4 = 4 * newWidth;
         for (y = 0; y < newHeight; y++)
         {
-            int pixelAddress = leftStart * 4 + y * _widthX4;
+            var pixelAddress = leftStart * 4 + y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, newWidthX4);
             index += newWidthX4;
         }
@@ -807,23 +706,20 @@ public class NikseBitmap
 
     public void CropTop(int maximumCropping, SKColor transparentColor)
     {
-        bool done = false;
-        int newTop = 0;
-        int y = 0;
+        var done = false;
+        var newTop = 0;
+        var y = 0;
         while (!done && y < Height)
         {
-            int x = 0;
+            var x = 0;
             while (!done && x < Width)
             {
-                SKColor c = GetPixel(x, y);
+                var c = GetPixel(x, y);
                 if (!c.Equals(transparentColor) && !(c.Alpha == 0 && transparentColor.Alpha == 0))
                 {
                     done = true;
                     newTop = y - maximumCropping;
-                    if (newTop < 0)
-                    {
-                        newTop = 0;
-                    }
+                    if (newTop < 0) newTop = 0;
                 }
 
                 x++;
@@ -832,17 +728,14 @@ public class NikseBitmap
             y++;
         }
 
-        if (newTop == 0)
-        {
-            return;
-        }
+        if (newTop == 0) return;
 
-        int newHeight = Height - newTop;
-        byte[] newBitmapData = new byte[newHeight * _widthX4];
-        int index = 0;
+        var newHeight = Height - newTop;
+        var newBitmapData = new byte[newHeight * _widthX4];
+        var index = 0;
         for (y = newTop; y < Height; y++)
         {
-            int pixelAddress = y * _widthX4;
+            var pixelAddress = y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, _widthX4);
             index += _widthX4;
         }
@@ -853,23 +746,20 @@ public class NikseBitmap
 
     public int CropTopTransparent(int minimumMargin)
     {
-        bool done = false;
-        int newTop = 0;
-        int y = 0;
+        var done = false;
+        var newTop = 0;
+        var y = 0;
         while (!done && y < Height)
         {
-            int x = 0;
+            var x = 0;
             while (!done && x < Width)
             {
-                int alpha = GetAlpha(x, y);
+                var alpha = GetAlpha(x, y);
                 if (alpha > 10)
                 {
                     done = true;
                     newTop = y - minimumMargin;
-                    if (newTop < 0)
-                    {
-                        newTop = 0;
-                    }
+                    if (newTop < 0) newTop = 0;
                 }
 
                 x++;
@@ -878,17 +768,14 @@ public class NikseBitmap
             y++;
         }
 
-        if (newTop == 0)
-        {
-            return 0;
-        }
+        if (newTop == 0) return 0;
 
-        int newHeight = Height - newTop;
-        byte[] newBitmapData = new byte[newHeight * _widthX4];
-        int index = 0;
+        var newHeight = Height - newTop;
+        var newBitmapData = new byte[newHeight * _widthX4];
+        var index = 0;
         for (y = newTop; y < Height; y++)
         {
-            int pixelAddress = y * _widthX4;
+            var pixelAddress = y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, _widthX4);
             index += _widthX4;
         }
@@ -900,138 +787,99 @@ public class NikseBitmap
 
     public int CalcTopCropping(SKColor color)
     {
-        int y = 0;
+        var y = 0;
         for (; y < Height; y++)
-        {
             if (!IsHorizontalLineColor(y, color))
-            {
                 break;
-            }
-        }
 
         return y;
     }
 
     public int CalcBottomCropping(SKColor color)
     {
-        int y = Height - 1;
+        var y = Height - 1;
         for (; y > 0; y--)
-        {
             if (!IsHorizontalLineColor(y, color))
-            {
                 break;
-            }
-        }
 
         return Height - y;
     }
 
     public int CalcBottomTransparent()
     {
-        int y = Height - 1;
+        var y = Height - 1;
         for (; y > 0; y--)
-        {
             if (!IsHorizontalLineTransparent(y))
-            {
                 break;
-            }
-        }
 
         return Height - y;
     }
 
     public int CalcLeftCropping(SKColor color)
     {
-        int x = 0;
+        var x = 0;
         for (; x < Width; x++)
-        {
             if (!IsVerticalLineColor(x, color))
-            {
                 break;
-            }
-        }
 
         return x;
     }
 
     public int CalcLeftCroppingTransparent()
     {
-        int x = 0;
+        var x = 0;
         for (; x < Width; x++)
-        {
             if (!IsVerticalLineTransparent(x))
-            {
                 break;
-            }
-        }
 
         return x;
     }
 
     public int CalcRightCropping(SKColor color)
     {
-        int x = Width - 1;
+        var x = Width - 1;
         for (; x > 0; x--)
-        {
             if (!IsVerticalLineColor(x, color))
-            {
                 break;
-            }
-        }
 
         return Width - x;
     }
 
     public bool IsVerticalLineColor(int x, SKColor color)
     {
-        for (int y = 0; y < Height; y++)
-        {
+        for (var y = 0; y < Height; y++)
             if (!IsColorClose(GetPixel(x, y), color, 9))
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
     public bool IsHorizontalLineColor(int y, SKColor color)
     {
-        for (int x = 0; x < Width; x++)
-        {
+        for (var x = 0; x < Width; x++)
             if (!IsColorClose(GetPixel(x, y), color, 9))
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
     public bool IsHorizontalLineTransparent(int y)
     {
-        for (int x = 0; x < Width; x++)
-        {
+        for (var x = 0; x < Width; x++)
             if (GetAlpha(x, y) > 1)
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
     public void Fill(SKColor color)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = color.Blue;
         buffer[1] = color.Green;
         buffer[2] = color.Red;
         buffer[3] = color.Alpha;
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
-            Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-        }
+        for (var i = 0; i < _bitmapData.Length; i += 4) Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
     }
 
     public int GetAlpha(int x, int y)
@@ -1050,15 +898,19 @@ public class NikseBitmap
         return new SKColor(
             _bitmapData[_pixelAddress + 2], // red
             _bitmapData[_pixelAddress + 1], // green
-            _bitmapData[_pixelAddress],     // blue
-            _bitmapData[_pixelAddress + 3]  // alpha
+            _bitmapData[_pixelAddress], // blue
+            _bitmapData[_pixelAddress + 3] // alpha
         );
     }
 
     public byte[] GetPixelColors(int x, int y)
     {
         _pixelAddress = x * 4 + y * _widthX4;
-        return new[] { _bitmapData[_pixelAddress + 3], _bitmapData[_pixelAddress + 2], _bitmapData[_pixelAddress + 1], _bitmapData[_pixelAddress] };
+        return new[]
+        {
+            _bitmapData[_pixelAddress + 3], _bitmapData[_pixelAddress + 2], _bitmapData[_pixelAddress + 1],
+            _bitmapData[_pixelAddress]
+        };
     }
 
     public SKColor GetPixelNext()
@@ -1067,8 +919,8 @@ public class NikseBitmap
         return new SKColor(
             _bitmapData[_pixelAddress + 2], // red
             _bitmapData[_pixelAddress + 1], // green
-            _bitmapData[_pixelAddress],     // blue
-            _bitmapData[_pixelAddress + 3]  // alpha
+            _bitmapData[_pixelAddress], // blue
+            _bitmapData[_pixelAddress + 3] // alpha
         );
     }
 
@@ -1084,19 +936,20 @@ public class NikseBitmap
     public SKBitmap GetBitmap()
     {
         var skBitmap = new SKBitmap(Width, Height, SKColorType.Bgra8888, SKAlphaType.Premul);
-        IntPtr pixels = skBitmap.GetPixels();
+        var pixels = skBitmap.GetPixels();
         Marshal.Copy(_bitmapData, 0, pixels, _bitmapData.Length);
         return skBitmap;
     }
 
     private static int FindBestMatch(SKColor color, List<SKColor> palette, out int maxDiff)
     {
-        int smallestDiff = 1000;
-        int smallestDiffIndex = -1;
-        int i = 0;
-        foreach (SKColor pc in palette)
+        var smallestDiff = 1000;
+        var smallestDiffIndex = -1;
+        var i = 0;
+        foreach (var pc in palette)
         {
-            int diff = Math.Abs(pc.Alpha - color.Alpha) + Math.Abs(pc.Red - color.Red) + Math.Abs(pc.Green - color.Green) + Math.Abs(pc.Blue - color.Blue);
+            var diff = Math.Abs(pc.Alpha - color.Alpha) + Math.Abs(pc.Red - color.Red) +
+                       Math.Abs(pc.Green - color.Green) + Math.Abs(pc.Blue - color.Blue);
             if (diff < smallestDiff)
             {
                 smallestDiff = diff;
@@ -1119,49 +972,47 @@ public class NikseBitmap
     {
         var newBitmap = new SKBitmap(Width, Height, SKColorType.Gray8, SKAlphaType.Opaque);
         var palette = new List<SKColor> { SKColors.Transparent };
-        byte[] pixels = new byte[Width * Height];
+        var pixels = new byte[Width * Height];
 
-        for (int y = 0; y < Height; y++)
+        for (var y = 0; y < Height; y++)
+        for (var x = 0; x < Width; x++)
         {
-            for (int x = 0; x < Width; x++)
+            var c = GetPixel(x, y);
+            if (c.Alpha < 5)
             {
-                SKColor c = GetPixel(x, y);
-                if (c.Alpha < 5)
-                {
-                    pixels[y * Width + x] = 0;
-                }
-                else
-                {
-                    int index = FindBestMatch(c, palette, out int maxDiff);
+                pixels[y * Width + x] = 0;
+            }
+            else
+            {
+                var index = FindBestMatch(c, palette, out var maxDiff);
 
-                    if (index == -1 && palette.Count < 255)
-                    {
-                        index = palette.Count;
-                        palette.Add(c);
-                        pixels[y * Width + x] = (byte)index;
-                    }
-                    else if (palette.Count < 200 && maxDiff > 5)
-                    {
-                        index = palette.Count;
-                        palette.Add(c);
-                        pixels[y * Width + x] = (byte)index;
-                    }
-                    else if (palette.Count < 255 && maxDiff > 15)
-                    {
-                        index = palette.Count;
-                        palette.Add(c);
-                        pixels[y * Width + x] = (byte)index;
-                    }
-                    else if (index >= 0)
-                    {
-                        pixels[y * Width + x] = (byte)index;
-                    }
+                if (index == -1 && palette.Count < 255)
+                {
+                    index = palette.Count;
+                    palette.Add(c);
+                    pixels[y * Width + x] = (byte)index;
+                }
+                else if (palette.Count < 200 && maxDiff > 5)
+                {
+                    index = palette.Count;
+                    palette.Add(c);
+                    pixels[y * Width + x] = (byte)index;
+                }
+                else if (palette.Count < 255 && maxDiff > 15)
+                {
+                    index = palette.Count;
+                    palette.Add(c);
+                    pixels[y * Width + x] = (byte)index;
+                }
+                else if (index >= 0)
+                {
+                    pixels[y * Width + x] = (byte)index;
                 }
             }
         }
 
         // Copy pixels to the new bitmap
-        IntPtr destPtr = newBitmap.GetPixels();
+        var destPtr = newBitmap.GetPixels();
         Marshal.Copy(pixels, 0, destPtr, pixels.Length);
 
         return newBitmap;
@@ -1176,22 +1027,18 @@ public class NikseBitmap
     public NikseBitmap CopyRectangle(SKRectI section)
     {
         if (section.Bottom > Height)
-        {
             section = new SKRectI(section.Left, section.Top, section.Width, Height - section.Top);
-        }
 
         if (section.Width + section.Left > Width)
-        {
             section = new SKRectI(section.Left, section.Top, Width - section.Left, section.Height);
-        }
 
-        byte[] newBitmapData = new byte[section.Width * section.Height * 4];
-        int index = 0;
-        int sectionWidthX4 = 4 * section.Width;
-        int sectionLeftX4 = 4 * section.Left;
-        for (int y = section.Top; y < section.Bottom; y++)
+        var newBitmapData = new byte[section.Width * section.Height * 4];
+        var index = 0;
+        var sectionWidthX4 = 4 * section.Width;
+        var sectionLeftX4 = 4 * section.Left;
+        for (var y = section.Top; y < section.Bottom; y++)
         {
-            int pixelAddress = sectionLeftX4 + y * _widthX4;
+            var pixelAddress = sectionLeftX4 + y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, sectionWidthX4);
             index += sectionWidthX4;
         }
@@ -1205,26 +1052,18 @@ public class NikseBitmap
     /// <returns>Brightest color, if not found or if brightes color is white, then transparent color is returned</returns>
     public SKColor GetBrightestColorWhiteIsTransparent()
     {
-        int max = Width * Height - 4;
-        SKColor brightest = SKColors.Black;
-        for (int i = 0; i < max; i++)
+        var max = Width * Height - 4;
+        var brightest = SKColors.Black;
+        for (var i = 0; i < max; i++)
         {
-            SKColor c = GetPixelNext();
-            if (c.Alpha > 220 && c.Red + c.Green + c.Blue > 200 && c.Red + c.Green + c.Blue > brightest.Red + brightest.Green + brightest.Blue)
-            {
-                brightest = c;
-            }
+            var c = GetPixelNext();
+            if (c.Alpha > 220 && c.Red + c.Green + c.Blue > 200 &&
+                c.Red + c.Green + c.Blue > brightest.Red + brightest.Green + brightest.Blue) brightest = c;
         }
 
-        if (IsColorClose(SKColors.White, brightest, 40))
-        {
-            return SKColors.Transparent;
-        }
+        if (IsColorClose(SKColors.White, brightest, 40)) return SKColors.Transparent;
 
-        if (IsColorClose(SKColors.Black, brightest, 10))
-        {
-            return SKColors.Transparent;
-        }
+        if (IsColorClose(SKColors.Black, brightest, 10)) return SKColors.Transparent;
 
         return brightest;
     }
@@ -1235,15 +1074,13 @@ public class NikseBitmap
     /// <returns>Brightest color</returns>
     public SKColor GetBrightestColor()
     {
-        int max = Width * Height - 4;
-        SKColor brightest = SKColors.Black;
-        for (int i = 0; i < max; i++)
+        var max = Width * Height - 4;
+        var brightest = SKColors.Black;
+        for (var i = 0; i < max; i++)
         {
-            SKColor c = GetPixelNext();
-            if (c.Alpha > 220 && c.Red + c.Green + c.Blue > 200 && c.Red + c.Green + c.Blue > brightest.Red + brightest.Green + brightest.Blue)
-            {
-                brightest = c;
-            }
+            var c = GetPixelNext();
+            if (c.Alpha > 220 && c.Red + c.Green + c.Blue > 200 &&
+                c.Red + c.Green + c.Blue > brightest.Red + brightest.Green + brightest.Blue) brightest = c;
         }
 
         return brightest;
@@ -1254,22 +1091,17 @@ public class NikseBitmap
         if (Math.Abs(color1.Red - color2.Red) < maxDiff &&
             Math.Abs(color1.Green - color2.Green) < maxDiff &&
             Math.Abs(color1.Blue - color2.Blue) < maxDiff)
-        {
             return true;
-        }
 
         return false;
     }
 
     public void GrayScale()
     {
-        for (int i = 0; i < _bitmapData.Length; i += 4)
+        for (var i = 0; i < _bitmapData.Length; i += 4)
         {
-            int medium = Convert.ToInt32((_bitmapData[i + 2] + _bitmapData[i + 1] + _bitmapData[i]) * 1.5 / 3.0 + 2);
-            if (medium > byte.MaxValue)
-            {
-                medium = byte.MaxValue;
-            }
+            var medium = Convert.ToInt32((_bitmapData[i + 2] + _bitmapData[i + 1] + _bitmapData[i]) * 1.5 / 3.0 + 2);
+            if (medium > byte.MaxValue) medium = byte.MaxValue;
 
             _bitmapData[i + 2] = _bitmapData[i + 1] = _bitmapData[i] = (byte)medium;
         }
@@ -1281,121 +1113,96 @@ public class NikseBitmap
     /// <param name="minAlpha">Min alpha value, 0=transparent, 255=fully visible</param>
     public void MakeBackgroundTransparent(int minAlpha)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = 0; // B
         buffer[1] = 0; // G
         buffer[2] = 0; // R
         buffer[3] = 0; // A
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] < minAlpha)
-            {
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void MakeTwoColor(int minRgb)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = 0; // B
         buffer[1] = 0; // G
         buffer[2] = 0; // R
         buffer[3] = 0; // A
-        byte[] bufferWhite = new byte[4];
+        var bufferWhite = new byte[4];
         bufferWhite[0] = 255; // B
         bufferWhite[1] = 255; // G
         bufferWhite[2] = 255; // R
         bufferWhite[3] = 255; // A
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] < 1 || _bitmapData[i + 0] + _bitmapData[i + 1] + _bitmapData[i + 2] < minRgb)
-            {
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-            }
             else
-            {
                 Buffer.BlockCopy(bufferWhite, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void MakeTwoColor(int minRgb, SKColor background, SKColor foreground)
     {
-        byte[] bufferBackground = new byte[4];
-        bufferBackground[0] = background.Blue;  // B
+        var bufferBackground = new byte[4];
+        bufferBackground[0] = background.Blue; // B
         bufferBackground[1] = background.Green; // G
-        bufferBackground[2] = background.Red;   // R
-        bufferBackground[3] = 255;              // A
-        byte[] bufferForeground = new byte[4];
-        bufferForeground[0] = foreground.Blue;  // B
+        bufferBackground[2] = background.Red; // R
+        bufferBackground[3] = 255; // A
+        var bufferForeground = new byte[4];
+        bufferForeground[0] = foreground.Blue; // B
         bufferForeground[1] = foreground.Green; // G
-        bufferForeground[2] = foreground.Red;   // R
-        bufferForeground[3] = 255;              // A
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        bufferForeground[2] = foreground.Red; // R
+        bufferForeground[3] = 255; // A
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] < 1 || _bitmapData[i + 0] + _bitmapData[i + 1] + _bitmapData[i + 2] < minRgb)
-            {
                 Buffer.BlockCopy(bufferBackground, 0, _bitmapData, i, 4);
-            }
             else
-            {
                 Buffer.BlockCopy(bufferForeground, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void MakeVerticalLinePartTransparent(int xStart, int xEnd, int y)
     {
-        if (xEnd > Width - 1)
-        {
-            xEnd = Width - 1;
-        }
+        if (xEnd > Width - 1) xEnd = Width - 1;
 
-        if (xStart < 0)
-        {
-            xStart = 0;
-        }
+        if (xStart < 0) xStart = 0;
 
-        int startIndex = xStart * 4 + y * _widthX4;
-        int endIndex = xEnd * 4 + y * _widthX4 + 4;
-        int length = endIndex - startIndex;
+        var startIndex = xStart * 4 + y * _widthX4;
+        var endIndex = xEnd * 4 + y * _widthX4 + 4;
+        var length = endIndex - startIndex;
         Buffer.BlockCopy(EmptyByteArray, 0, _bitmapData, startIndex, length);
     }
 
     public void AddTransparentLineRight()
     {
-        int newWidth = Width + 1;
+        var newWidth = Width + 1;
 
-        byte[] newBitmapData = new byte[newWidth * Height * 4];
-        int index = 0;
-        for (int y = 0; y < Height; y++)
+        var newBitmapData = new byte[newWidth * Height * 4];
+        var index = 0;
+        for (var y = 0; y < Height; y++)
         {
-            int pixelAddress = 0 * 4 + y * _widthX4;
+            var pixelAddress = 0 * 4 + y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, _widthX4);
             index += 4 * newWidth;
         }
 
         Width = newWidth;
         _bitmapData = newBitmapData;
-        for (int y = 0; y < Height; y++)
-        {
-            SetPixel(Width - 1, y, SKColors.Transparent);
-        }
+        for (var y = 0; y < Height; y++) SetPixel(Width - 1, y, SKColors.Transparent);
     }
 
     public void AddMargin(int margin)
     {
-        int newWidth = Width + margin * 2;
-        int newHeight = Height + margin * 2;
-        byte[] newBitmapData = new byte[newWidth * newHeight * 4];
-        int newWidthX4 = newWidth * 4;
-        int marginX4 = margin * 4;
+        var newWidth = Width + margin * 2;
+        var newHeight = Height + margin * 2;
+        var newBitmapData = new byte[newWidth * newHeight * 4];
+        var newWidthX4 = newWidth * 4;
+        var marginX4 = margin * 4;
 
-        for (int y = 0; y < Height; y++)
+        for (var y = 0; y < Height; y++)
         {
-            int pixelAddress = y * _widthX4;
-            int index = marginX4 + (y + margin) * newWidthX4;
+            var pixelAddress = y * _widthX4;
+            var index = marginX4 + (y + margin) * newWidthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, _widthX4);
         }
 
@@ -1409,37 +1216,35 @@ public class NikseBitmap
         // TGA header (18-byte fixed header)
         byte[] header =
         {
-            0,          // ID length (1 bytes)
-            0,          // no color map (1 bytes)
-            2,          // uncompressed, true color (1 bytes)
-            0, 0,       // Color map First Entry Index
-            0, 0,       // Color map Length
-            0,          // Color map Entry Size
+            0, // ID length (1 bytes)
+            0, // no color map (1 bytes)
+            2, // uncompressed, true color (1 bytes)
+            0, 0, // Color map First Entry Index
+            0, 0, // Color map Length
+            0, // Color map Entry Size
             0, 0, 0, 0, // x and y origin
             (byte)(Width & 0x00FF),
             (byte)((Width & 0xFF00) >> 8),
             (byte)(Height & 0x00FF),
             (byte)((Height & 0xFF00) >> 8),
             32, // pixel depth - 32=32 bit bitmap
-            0   // Image Descriptor
+            0 // Image Descriptor
         };
 
-        byte[] pixels = new byte[_bitmapData.Length];
-        int offsetDest = 0;
-        for (int y = Height - 1; y >= 0; y--) // takes lines from bottom lines to top (mirrored horizontally)
+        var pixels = new byte[_bitmapData.Length];
+        var offsetDest = 0;
+        for (var y = Height - 1; y >= 0; y--) // takes lines from bottom lines to top (mirrored horizontally)
+        for (var x = 0; x < Width; x++)
         {
-            for (int x = 0; x < Width; x++)
-            {
-                SKColor c = GetPixel(x, y);
-                pixels[offsetDest] = c.Blue;
-                pixels[offsetDest + 1] = c.Green;
-                pixels[offsetDest + 2] = c.Red;
-                pixels[offsetDest + 3] = c.Alpha;
-                offsetDest += 4;
-            }
+            var c = GetPixel(x, y);
+            pixels[offsetDest] = c.Blue;
+            pixels[offsetDest + 1] = c.Green;
+            pixels[offsetDest + 2] = c.Red;
+            pixels[offsetDest + 3] = c.Alpha;
+            offsetDest += 4;
         }
 
-        using (FileStream fileStream = File.Create(fileName))
+        using (var fileStream = File.Create(fileName))
         {
             fileStream.Write(header, 0, header.Length);
             fileStream.Write(pixels, 0, pixels.Length);
@@ -1451,51 +1256,40 @@ public class NikseBitmap
     /// </summary>
     public bool IsLineTransparent(int y)
     {
-        int max = _width * 4 + y * _widthX4 + 3;
-        for (int pos = y * _widthX4 + 3; pos < max; pos += 4)
-        {
+        var max = _width * 4 + y * _widthX4 + 3;
+        for (var pos = y * _widthX4 + 3; pos < max; pos += 4)
             if (_bitmapData[pos] != 0)
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
     public bool IsVerticalLineTransparent(int x)
     {
-        int xOffset = x * 4 + 3;
-        for (int y = 0; y < Height; y++)
-        {
+        var xOffset = x * 4 + 3;
+        for (var y = 0; y < Height; y++)
             if (_bitmapData[xOffset + y * _widthX4] > 0)
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
     public bool IsImageOnlyTransparent()
     {
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i] != 0) // check alpha
-            {
                 return false;
-            }
-        }
+
         return true;
     }
 
     public int GetNonTransparentHeight()
     {
-        int startY = 0;
-        int transparentBottomPixels = 0;
-        for (int y = 0; y < Height; y++)
+        var startY = 0;
+        var transparentBottomPixels = 0;
+        for (var y = 0; y < Height; y++)
         {
-            bool isLineTransparent = IsLineTransparent(y);
+            var isLineTransparent = IsLineTransparent(y);
             if (startY == y && isLineTransparent)
             {
                 startY++;
@@ -1503,13 +1297,9 @@ public class NikseBitmap
             }
 
             if (isLineTransparent)
-            {
                 transparentBottomPixels++;
-            }
             else
-            {
                 transparentBottomPixels = 0;
-            }
         }
 
         return Height - startY - transparentBottomPixels;
@@ -1517,11 +1307,11 @@ public class NikseBitmap
 
     public int GetNonTransparentWidth()
     {
-        int startX = 0;
-        int transparentPixelsRight = 0;
-        for (int x = 0; x < Width; x++)
+        var startX = 0;
+        var transparentPixelsRight = 0;
+        for (var x = 0; x < Width; x++)
         {
-            bool isLineTransparent = IsVerticalLineTransparent(x);
+            var isLineTransparent = IsVerticalLineTransparent(x);
             if (startX == x && isLineTransparent)
             {
                 startX++;
@@ -1529,13 +1319,9 @@ public class NikseBitmap
             }
 
             if (isLineTransparent)
-            {
                 transparentPixelsRight++;
-            }
             else
-            {
                 transparentPixelsRight = 0;
-            }
         }
 
         return Width - startX - transparentPixelsRight;
@@ -1543,104 +1329,80 @@ public class NikseBitmap
 
     public void EnsureEvenLines(SKColor fillColor)
     {
-        if (Width % 2 == 0 && Height % 2 == 0)
-        {
-            return;
-        }
+        if (Width % 2 == 0 && Height % 2 == 0) return;
 
-        int newWidth = Width;
-        bool widthChanged = false;
+        var newWidth = Width;
+        var widthChanged = false;
         if (Width % 2 != 0)
         {
             newWidth++;
             widthChanged = true;
         }
 
-        int newHeight = Height;
-        bool heightChanged = false;
+        var newHeight = Height;
+        var heightChanged = false;
         if (Height % 2 != 0)
         {
             newHeight++;
             heightChanged = true;
         }
 
-        byte[] newBitmapData = new byte[newWidth * newHeight * 4];
-        int newWidthX4 = 4 * newWidth;
-        int index = 0;
-        for (int y = 0; y < Height; y++)
+        var newBitmapData = new byte[newWidth * newHeight * 4];
+        var newWidthX4 = 4 * newWidth;
+        var index = 0;
+        for (var y = 0; y < Height; y++)
         {
-            int pixelAddress = y * _widthX4;
+            var pixelAddress = y * _widthX4;
             Buffer.BlockCopy(_bitmapData, pixelAddress, newBitmapData, index, _widthX4);
             index += newWidthX4;
         }
+
         Width = newWidth;
         Height = newHeight;
         _bitmapData = newBitmapData;
 
         if (widthChanged)
-        {
-            for (int y = 0; y < Height; y++)
-            {
+            for (var y = 0; y < Height; y++)
                 SetPixel(Width - 1, y, fillColor);
-            }
-        }
 
         if (heightChanged)
-        {
-            for (int x = 0; x < Width; x++)
-            {
+            for (var x = 0; x < Width; x++)
                 SetPixel(x, Height - 1, fillColor);
-            }
-        }
     }
 
     public bool IsEqualTo(NikseBitmap bitmap)
     {
-        if (Width != bitmap.Width || Height != bitmap.Height)
-        {
-            return false;
-        }
+        if (Width != bitmap.Width || Height != bitmap.Height) return false;
 
         if (Width == bitmap.Width &&
             Height == bitmap.Height &&
             Width == 0 &&
             Height == 0)
-        {
             return true;
-        }
 
-        for (int i = 0; i < _bitmapData.Length; i++)
-        {
+        for (var i = 0; i < _bitmapData.Length; i++)
             if (_bitmapData[i] != bitmap._bitmapData[i])
-            {
                 return false;
-            }
-        }
 
         return true;
     }
 
     public void SetTransparentTo(SKColor transparent)
     {
-        byte[] buffer = new byte[4];
+        var buffer = new byte[4];
         buffer[0] = transparent.Blue;
         buffer[1] = transparent.Green;
         buffer[2] = transparent.Red;
         buffer[3] = transparent.Alpha;
-        for (int i = 0; i < _bitmapData.Length; i += 4)
-        {
+        for (var i = 0; i < _bitmapData.Length; i += 4)
             if (_bitmapData[i + 3] == 0)
-            {
                 Buffer.BlockCopy(buffer, 0, _bitmapData, i, 4);
-            }
-        }
     }
 
     public void ChangeBrightness(decimal factor)
     {
         if (factor > 1)
-        {
-            for (int i = 0; i < _bitmapData.Length; i += 4)
+            for (var i = 0; i < _bitmapData.Length; i += 4)
             {
                 int r = _bitmapData[i + 2];
                 int g = _bitmapData[i + 1];
@@ -1649,10 +1411,8 @@ public class NikseBitmap
                 _bitmapData[i + 1] = (byte)Math.Min(byte.MaxValue, (int)(g * factor));
                 _bitmapData[i] = (byte)Math.Min(byte.MaxValue, (int)(b * factor));
             }
-        }
         else
-        {
-            for (int i = 0; i < _bitmapData.Length; i += 4)
+            for (var i = 0; i < _bitmapData.Length; i += 4)
             {
                 int r = _bitmapData[i + 2];
                 int g = _bitmapData[i + 1];
@@ -1661,26 +1421,21 @@ public class NikseBitmap
                 _bitmapData[i + 1] = (byte)Math.Max(0, (int)(g * factor));
                 _bitmapData[i] = (byte)Math.Max(0, (int)(b * factor));
             }
-        }
     }
 
     public void ChangeAlpha(decimal factor)
     {
         if (factor > 1)
-        {
-            for (int i = 0; i < _bitmapData.Length; i += 4)
+            for (var i = 0; i < _bitmapData.Length; i += 4)
             {
                 int a = _bitmapData[i + 3];
                 _bitmapData[i + 3] = (byte)Math.Min(byte.MaxValue, (int)(a * factor));
             }
-        }
         else
-        {
-            for (int i = 0; i < _bitmapData.Length; i += 4)
+            for (var i = 0; i < _bitmapData.Length; i += 4)
             {
                 int a = _bitmapData[i + 3];
                 _bitmapData[i + 3] = (byte)Math.Max(0, (int)(a * factor));
             }
-        }
     }
 }

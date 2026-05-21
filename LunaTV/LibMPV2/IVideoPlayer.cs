@@ -1,7 +1,7 @@
-﻿using LunaTV.Logic.LibMpvDynamic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using LunaTV.LibMPV2.LibMpvDynamic;
 
-namespace LunaTV.Logic;
+namespace LunaTV.LibMpv2;
 
 public interface IVideoPlayer
 {

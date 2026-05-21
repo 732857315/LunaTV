@@ -1,11 +1,11 @@
-﻿using Avalonia.Controls;
-using Avalonia.Platform.Storage;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 
-namespace LunaTV.Logic.Media;
+namespace LunaTV.LibMPV2.Media;
 
 public interface IFolderHelper
 {
@@ -18,7 +18,7 @@ public class FolderHelper : IFolderHelper
 {
     public async Task<string> PickFolderAsync(Window window, string title)
     {
-        IStorageProvider storageProvider = window.StorageProvider;
+        var storageProvider = window.StorageProvider;
 
         if (storageProvider.CanPickFolder)
         {
@@ -28,7 +28,7 @@ public class FolderHelper : IFolderHelper
                 AllowMultiple = false
             });
 
-            IStorageFolder? selected = folders.Count > 0 ? folders[0] : null;
+            var selected = folders.Count > 0 ? folders[0] : null;
             return selected?.Path.LocalPath ?? string.Empty;
         }
 
@@ -47,7 +47,7 @@ public class FolderHelper : IFolderHelper
                 CreateNoWindow = true
             };
 
-            using Process? process = Process.Start(startInfo);
+            using var process = Process.Start(startInfo);
             return;
         }
 
@@ -61,7 +61,7 @@ public class FolderHelper : IFolderHelper
                 CreateNoWindow = true
             };
 
-            using Process? process = Process.Start(startInfo);
+            using var process = Process.Start(startInfo);
             return;
         }
 
@@ -81,7 +81,7 @@ public class FolderHelper : IFolderHelper
                 CreateNoWindow = true
             };
 
-            using Process? process = Process.Start(startInfo);
+            using var process = Process.Start(startInfo);
             return;
         }
 
@@ -95,15 +95,12 @@ public class FolderHelper : IFolderHelper
                 CreateNoWindow = true
             };
 
-            using Process? process = Process.Start(startInfo);
+            using var process = Process.Start(startInfo);
             return;
         }
 
-        string? folder = Path.GetDirectoryName(selectedFile);
-        if (folder == null)
-        {
-            return;
-        }
+        var folder = Path.GetDirectoryName(selectedFile);
+        if (folder == null) return;
 
         var dirInfo = new DirectoryInfo(folder);
         await window.Launcher.LaunchDirectoryInfoAsync(dirInfo);

@@ -1,8 +1,9 @@
-using LunaTV.Logic;
-using LunaTV.Logic.LibMpvDynamic;
 using System.Threading.Tasks;
+using LunaTV.LibMpv2;
+using LunaTV.LibMpv2.LibMpvDynamic;
+using LunaTV.LibMPV2.LibMpvDynamic;
 
-namespace LunaTV.Views.Media;
+namespace LunaTV.LibMPV2;
 
 public class EmptyVideoPlayer : IVideoPlayer
 {
@@ -26,17 +27,13 @@ public class EmptyVideoPlayer : IVideoPlayer
     public double Volume
     {
         get => 0;
-        set
-        {
-        }
+        set { }
     }
 
     public double Speed
     {
         get => 0;
-        set
-        {
-        }
+        set { }
     }
 
     public bool CanLoad()

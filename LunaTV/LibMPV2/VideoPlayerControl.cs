@@ -1,3 +1,8 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -9,15 +14,11 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
-using LunaTV.Logic;
-using LunaTV.Logic.LibMpvDynamic;
-using System;
-using System.Diagnostics;
-using System.IO;
-using System.Threading.Tasks;
-using System.Windows.Input;
+using LunaTV.LibMpv2;
+using LunaTV.LibMpv2.LibMpvDynamic;
+using LunaTV.LibMPV2.LibMpvDynamic;
 
-namespace LunaTV.Views.Media;
+namespace LunaTV.LibMPV2;
 
 public class VideoPlayerControl : UserControl
 {
@@ -57,13 +58,14 @@ public class VideoPlayerControl : UserControl
     private readonly Button _buttonFullScreen;
     private readonly Button _buttonFullScreenCollapse;
     private readonly Button _buttonPlay;
+    private readonly ContentPresenter? _contentPresenter;
     private readonly Grid _gridProgress; // Reference to the controls grid
     private readonly TextBlock _iconVolume;
     private readonly TextBlock _textBlockPlayerName;
 
     private readonly TextBlock _textBlockVideoFileName;
+    private readonly double _volumeIgnore = -1;
     private DispatcherTimer? _autoHideTimer;
-    private readonly ContentPresenter? _contentPresenter;
 
     private bool _isFullScreen;
     private DateTime _lastActivityTime;
@@ -73,7 +75,6 @@ public class VideoPlayerControl : UserControl
     private int _slowPollCounter;
     private bool _surfaceLeftButtonDown;
     private string _videoFileName;
-    private readonly double _volumeIgnore = -1;
 
     public VideoPlayerControl(IVideoPlayer videoPlayerInstance)
     {
@@ -84,7 +85,7 @@ public class VideoPlayerControl : UserControl
         var mainGrid = new Grid
         {
             RowDefinitions = new RowDefinitions("*,Auto"), // video + controls
-            Background = Brushes.Transparent               // Enable hit testing for pointer events
+            Background = Brushes.Transparent // Enable hit testing for pointer events
         };
 
         // PlayerContent
@@ -110,7 +111,8 @@ public class VideoPlayerControl : UserControl
         mainGrid.AddHandler(PointerPressedEvent, OnMainGridPointerPressed, RoutingStrategies.Tunnel, true);
         // Release handler is on `this` (not mainGrid) so it still fires when the pointer
         // is captured to this control — routing wouldn't reach mainGrid in that case.
-        AddHandler(PointerReleasedEvent, OnMainGridPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+        AddHandler(PointerReleasedEvent, OnMainGridPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble,
+            true);
 
         // Buttons
         var stackPanel = new StackPanel
@@ -223,16 +225,17 @@ public class VideoPlayerControl : UserControl
         // Also ensure the control can receive keyboard focus
         sliderPosition.Focusable = true;
 
-        bool sliderPositionUserMoving = false;
-        sliderPosition.AddHandler(PointerPressedEvent, (_, _) => sliderPositionUserMoving = true, RoutingStrategies.Tunnel);
-        sliderPosition.AddHandler(PointerReleasedEvent, (_, _) => sliderPositionUserMoving = false, RoutingStrategies.Tunnel);
-        sliderPosition.AddHandler(PointerCaptureLostEvent, (_, _) => sliderPositionUserMoving = false, RoutingStrategies.Tunnel);
+        var sliderPositionUserMoving = false;
+        sliderPosition.AddHandler(PointerPressedEvent, (_, _) => sliderPositionUserMoving = true,
+            RoutingStrategies.Tunnel);
+        sliderPosition.AddHandler(PointerReleasedEvent, (_, _) => sliderPositionUserMoving = false,
+            RoutingStrategies.Tunnel);
+        sliderPosition.AddHandler(PointerCaptureLostEvent, (_, _) => sliderPositionUserMoving = false,
+            RoutingStrategies.Tunnel);
         sliderPosition.AddHandler(KeyDownEvent, (_, e) =>
         {
-            if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp or Key.PageDown)
-            {
-                sliderPositionUserMoving = true;
-            }
+            if (e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.PageUp
+                or Key.PageDown) sliderPositionUserMoving = true;
         }, RoutingStrategies.Tunnel);
         sliderPosition.AddHandler(KeyUpEvent, (_, _) => sliderPositionUserMoving = false, RoutingStrategies.Tunnel);
 
@@ -240,10 +243,7 @@ public class VideoPlayerControl : UserControl
         sliderPosition.ValueChanged += (s, e) =>
         {
             NotifyPositionChanged(e.NewValue);
-            if (sliderPositionUserMoving)
-            {
-                UserSeeked?.Invoke(e.NewValue);
-            }
+            if (sliderPositionUserMoving) UserSeeked?.Invoke(e.NewValue);
         };
 
         _gridProgress.Children.Add(sliderPosition);
@@ -278,10 +278,7 @@ public class VideoPlayerControl : UserControl
 
         sliderVolume.ValueChanged += (s, e) =>
         {
-            if (_volumeIgnore == e.NewValue)
-            {
-                return;
-            }
+            if (_volumeIgnore == e.NewValue) return;
 
             Volume = e.NewValue;
             VideoPlayer.Volume = e.NewValue;
@@ -330,10 +327,7 @@ public class VideoPlayerControl : UserControl
         };
         _gridProgress.Children.Add(_textBlockVideoFileName);
         Grid.SetColumn(_textBlockVideoFileName, 4);
-        _textBlockVideoFileName.PointerPressed += (_, e) =>
-        {
-            VideoFileNamePointerPressed?.Invoke(e);
-        };
+        _textBlockVideoFileName.PointerPressed += (_, e) => { VideoFileNamePointerPressed?.Invoke(e); };
 
         Content = mainGrid;
 
@@ -359,13 +353,8 @@ public class VideoPlayerControl : UserControl
         set
         {
             if (value < 0)
-            {
                 value = 0;
-            }
-            else if (value > VideoPlayer.VolumeMaximum)
-            {
-                value = VideoPlayer.VolumeMaximum;
-            }
+            else if (value > VideoPlayer.VolumeMaximum) value = VideoPlayer.VolumeMaximum;
 
             SetValue(VolumeProperty, value);
             VideoPlayer.Volume = value;
@@ -428,10 +417,7 @@ public class VideoPlayerControl : UserControl
         get => _isFullScreen;
         set
         {
-            if (_isFullScreen == value)
-            {
-                return;
-            }
+            if (_isFullScreen == value) return;
 
             _buttonFullScreenCollapse.IsVisible = value;
             _buttonFullScreen.IsVisible = !value;
@@ -469,10 +455,7 @@ public class VideoPlayerControl : UserControl
 
     private void NotifyPositionChanged(double newPosition)
     {
-        if (Math.Abs(_positionIgnore - newPosition) < 0.001)
-        {
-            return;
-        }
+        if (Math.Abs(_positionIgnore - newPosition) < 0.001) return;
 
         // First update our property
         Position = newPosition;
@@ -499,17 +482,14 @@ public class VideoPlayerControl : UserControl
 
     private void OnMainGridPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        PointerPointProperties props = e.GetCurrentPoint(this).Properties;
-        if (props.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed || _surfaceLeftButtonDown)
-        {
-            return;
-        }
+        var props = e.GetCurrentPoint(this).Properties;
+        if (props.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed || _surfaceLeftButtonDown) return;
 
         // If the click is inside the controls row (_gridProgress), ignore it
-        bool inControls = false;
+        var inControls = false;
         try
         {
-            Point ptInControls = e.GetPosition(_gridProgress);
+            var ptInControls = e.GetPosition(_gridProgress);
             inControls =
                 ptInControls.X >= 0 &&
                 ptInControls.Y >= 0 &&
@@ -521,10 +501,7 @@ public class VideoPlayerControl : UserControl
             // ignore
         }
 
-        if (inControls)
-        {
-            return;
-        }
+        if (inControls) return;
 
         _surfaceLeftButtonDown = true;
         e.Pointer.Capture(this);
@@ -540,20 +517,15 @@ public class VideoPlayerControl : UserControl
         }
 
         if (IsFullScreen)
-        {
             // Consider this user activity for the auto-hide logic
             OnUserActivity();
-        }
     }
 
     private void OnMainGridPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (!_surfaceLeftButtonDown)
-        {
-            return;
-        }
+        if (!_surfaceLeftButtonDown) return;
 
-        PointerPointProperties props = e.GetCurrentPoint(this).Properties;
+        var props = e.GetCurrentPoint(this).Properties;
         if (!props.IsLeftButtonPressed)
         {
             _surfaceLeftButtonDown = false;
@@ -574,21 +546,14 @@ public class VideoPlayerControl : UserControl
     public void SetPlayPauseIcon(bool isPlaying)
     {
         if (isPlaying)
-        {
             AutomationProperties.SetName(_buttonPlay, "Pause");
-        }
         else
-        {
             AutomationProperties.SetName(_buttonPlay, "Play");
-        }
     }
 
     public void SetVolumeIcon(bool isMuted)
     {
-        Dispatcher.UIThread.Invoke(() =>
-        {
-            _iconVolume.Text = isMuted ? "x" : "v";
-        });
+        Dispatcher.UIThread.Invoke(() => { _iconVolume.Text = isMuted ? "x" : "v"; });
     }
 
     internal async Task Open(string videoFileName)
@@ -614,16 +579,10 @@ public class VideoPlayerControl : UserControl
         // setter doesn't run a fresh true→true transition — so without this
         // the controls would stay visible until the user moves the cursor on
         // the fullscreen monitor.
-        if (IsFullScreen)
-        {
-            StartAutoHideControls();
-        }
+        if (IsFullScreen) StartAutoHideControls();
 
-        string shortName = Path.GetFileName(videoFileName);
-        if (shortName.Length > 55)
-        {
-            shortName = "..." + shortName[^50..];
-        }
+        var shortName = Path.GetFileName(videoFileName);
+        if (shortName.Length > 55) shortName = "..." + shortName[^50..];
         _textBlockVideoFileName.Text = shortName;
     }
 
@@ -641,16 +600,13 @@ public class VideoPlayerControl : UserControl
 
     internal async Task WaitForPlayersReadyAsync(int timeoutMs = 2500)
     {
-        DateTime end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        var end = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (DateTime.UtcNow < end)
         {
             // Consider player ready when Duration is known (> 0)
-            bool ready = VideoPlayer.Duration > 0.001;
+            var ready = VideoPlayer.Duration > 0.001;
 
-            if (ready)
-            {
-                break;
-            }
+            if (ready) break;
 
             await Task.Delay(100);
         }
@@ -685,29 +641,22 @@ public class VideoPlayerControl : UserControl
                 SetPlayPauseIcon(VideoPlayer.IsPlaying);
             }
 
-            string postFix = IsSmpteTimingEnabled ? " (SMPTE)" : string.Empty;
-            double pos = VideoPlayer.Position;
-            if (IsSmpteTimingEnabled)
-            {
-                pos = pos * 1000.0 / 1001.0; // SMPTE timing adjustment
-            }
+            var postFix = IsSmpteTimingEnabled ? " (SMPTE)" : string.Empty;
+            var pos = VideoPlayer.Position;
+            if (IsSmpteTimingEnabled) pos = pos * 1000.0 / 1001.0; // SMPTE timing adjustment
 
             SetPositionDisplayOnly(pos);
 
             if (VideoPlayerDisplayTimeLeft)
             {
-                double left = Duration - pos;
+                var left = Duration - pos;
 
                 if (left > 0.001)
-                {
                     ProgressText =
                         $"-{left.ToString("0.00")}{postFix}";
-                }
                 else
-                {
                     ProgressText =
                         $"{0.ToString("0.00")}{postFix}";
-                }
             }
             else
             {
@@ -744,10 +693,7 @@ public class VideoPlayerControl : UserControl
             _autoHideTimer.Tick += (s, e) =>
             {
                 _autoHideTimer?.Stop();
-                if (IsFullScreen)
-                {
-                    HideControls();
-                }
+                if (IsFullScreen) HideControls();
             };
         }
 
@@ -766,10 +712,7 @@ public class VideoPlayerControl : UserControl
         if (IsFullScreen)
         {
             // If the user opted to hide controls in full-screen, don't reveal them on activity.
-            if (false)
-            {
-                return;
-            }
+            if (false) return;
 
             ShowControls();
             if (_autoHideTimer != null)
@@ -787,16 +730,13 @@ public class VideoPlayerControl : UserControl
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (IsFullScreen)
-        {
-            OnUserActivity();
-        }
+        if (IsFullScreen) OnUserActivity();
     }
 
     public void Reload()
     {
-        string videoFileName = _videoFileName;
-        double position = Position;
+        var videoFileName = _videoFileName;
+        var position = Position;
         Close();
         Dispatcher.UIThread.Post(async () =>
         {
@@ -816,18 +756,12 @@ public class VideoPlayerControl : UserControl
 
     private void ShowControls()
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _gridProgress.IsVisible = true;
-        });
+        Dispatcher.UIThread.Post(() => { _gridProgress.IsVisible = true; });
     }
 
     private void HideControls()
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _gridProgress.IsVisible = false;
-        });
+        Dispatcher.UIThread.Post(() => { _gridProgress.IsVisible = false; });
     }
 
     internal void SetSpeed(double speed)

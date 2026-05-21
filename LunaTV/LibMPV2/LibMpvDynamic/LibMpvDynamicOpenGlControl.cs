@@ -1,14 +1,14 @@
-using Avalonia;
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
 using Avalonia.Threading;
-using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+using LunaTV.LibMpv2.LibMpvDynamic;
 
-namespace LunaTV.Logic.LibMpvDynamic;
+namespace LunaTV.LibMPV2.LibMpvDynamic;
 
 public class LibMpvDynamicOpenGlControl : OpenGlControlBase
 {
@@ -63,18 +63,13 @@ public class LibMpvDynamicOpenGlControl : OpenGlControlBase
 
     private void ResolveGlFunctions(GlInterface gl)
     {
-        IntPtr clearPtr = gl.GetProcAddress("glClear");
-        IntPtr clearColorPtr = gl.GetProcAddress("glClearColor");
+        var clearPtr = gl.GetProcAddress("glClear");
+        var clearColorPtr = gl.GetProcAddress("glClearColor");
 
-        if (clearPtr != IntPtr.Zero)
-        {
-            _glClear = Marshal.GetDelegateForFunctionPointer<GlClearDelegate>(clearPtr);
-        }
+        if (clearPtr != IntPtr.Zero) _glClear = Marshal.GetDelegateForFunctionPointer<GlClearDelegate>(clearPtr);
 
         if (clearColorPtr != IntPtr.Zero)
-        {
             _glClearColor = Marshal.GetDelegateForFunctionPointer<GlClearColorDelegate>(clearColorPtr);
-        }
     }
 
     private void OnMpvRequestRender()
@@ -102,15 +97,12 @@ public class LibMpvDynamicOpenGlControl : OpenGlControlBase
             return;
         }
 
-        double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
-        Size size = Bounds.Size * scaling;
-        int width = (int)size.Width;
-        int height = (int)size.Height;
+        var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        var size = Bounds.Size * scaling;
+        var width = (int)size.Width;
+        var height = (int)size.Height;
 
-        if (width <= 0 || height <= 0)
-        {
-            return;
-        }
+        if (width <= 0 || height <= 0) return;
 
         try
         {

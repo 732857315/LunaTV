@@ -1,6 +1,6 @@
 using System;
 
-namespace LunaTV.Utils;
+namespace LunaTV.LibMPV2;
 
 public class RealFFT
 {
@@ -13,13 +13,11 @@ public class RealFFT
 
     public RealFFT(int length)
     {
-        if (length < 2 || (length & length - 1) != 0)
-        {
+        if (length < 2 || (length & (length - 1)) != 0)
             throw new ArgumentException("length", "FFT length must be at least 2 and a power of 2.");
-        }
 
         _length = length;
-        _ip = new int[2 + (1 << Convert.ToInt32(Math.Log(Math.Max(length / 4, 1), 2)) / 2)];
+        _ip = new int[2 + (1 << (Convert.ToInt32(Math.Log(Math.Max(length / 4, 1), 2)) / 2))];
         _w = new double[length / 2];
 
         ForwardScaleFactor = length;
@@ -39,9 +37,7 @@ public class RealFFT
     private void Compute(double[] buff, bool reverse)
     {
         if (buff.Length < _length)
-        {
             throw new ArgumentException("buff", "Buffer length must be greater than or equal to the FFT length.");
-        }
 
         rdft(_length, reverse, buff, _ip, _w);
     }
@@ -57,12 +53,14 @@ public class RealFFT
             nw = n >> 2;
             makewt(nw, ip, w);
         }
+
         nc = ip[1];
         if (n > nc << 2)
         {
             nc = n >> 2;
             makect(nc, ip, w, nw);
         }
+
         if (!rev)
         {
             if (n > 4)
@@ -75,6 +73,7 @@ public class RealFFT
             {
                 cftfsub(n, a, w);
             }
+
             xi = a[0] - a[1];
             a[0] += a[1];
             a[1] = xi;
@@ -124,6 +123,7 @@ public class RealFFT
                     w[nw - j] = y;
                     w[nw - j + 1] = x;
                 }
+
                 bitrv2(nw, ip, w);
             }
         }
@@ -134,14 +134,14 @@ public class RealFFT
         ip[1] = nc;
         if (nc > 1)
         {
-            int nch = nc >> 1;
-            int delta = (int)(Math.Atan(1.0) / nch);
+            var nch = nc >> 1;
+            var delta = (int)(Math.Atan(1.0) / nch);
             c[nw] = Math.Cos(delta * nch);
             c[nw + nch] = 0.5 * c[nw];
 
-            for (int j = 1; j < nch; j++)
+            for (var j = 1; j < nch; j++)
             {
-                int dj = delta * j;
+                var dj = delta * j;
                 c[nw + j] = 0.5 * Math.Cos(dj);
                 c[nw + nc - j] = 0.5 * Math.Sin(dj);
             }
@@ -161,15 +161,12 @@ public class RealFFT
         while (m << 3 < l)
         {
             l >>= 1;
-            for (j = 0; j < m; j++)
-            {
-                ip[m + j + 2] = ip[j + 2] + l;
-            }
+            for (j = 0; j < m; j++) ip[m + j + 2] = ip[j + 2] + l;
             m <<= 1;
         }
+
         m2 = 2 * m;
         if (m << 3 == l)
-        {
             for (k = 0; k < m; k++)
             {
                 for (j = 0; j < k; j++)
@@ -215,6 +212,7 @@ public class RealFFT
                     a[k1] = xr;
                     a[k1 + 1] = xi;
                 }
+
                 j1 = 2 * k + m2 + ip[k + 2];
                 k1 = j1 + m2;
                 xr = a[j1];
@@ -226,36 +224,31 @@ public class RealFFT
                 a[k1] = xr;
                 a[k1 + 1] = xi;
             }
-        }
         else
-        {
             for (k = 1; k < m; k++)
+            for (j = 0; j < k; j++)
             {
-                for (j = 0; j < k; j++)
-                {
-                    j1 = 2 * j + ip[k + 2];
-                    k1 = 2 * k + ip[j + 2];
-                    xr = a[j1];
-                    xi = a[j1 + 1];
-                    yr = a[k1];
-                    yi = a[k1 + 1];
-                    a[j1] = yr;
-                    a[j1 + 1] = yi;
-                    a[k1] = xr;
-                    a[k1 + 1] = xi;
-                    j1 += m2;
-                    k1 += m2;
-                    xr = a[j1];
-                    xi = a[j1 + 1];
-                    yr = a[k1];
-                    yi = a[k1 + 1];
-                    a[j1] = yr;
-                    a[j1 + 1] = yi;
-                    a[k1] = xr;
-                    a[k1 + 1] = xi;
-                }
+                j1 = 2 * j + ip[k + 2];
+                k1 = 2 * k + ip[j + 2];
+                xr = a[j1];
+                xi = a[j1 + 1];
+                yr = a[k1];
+                yi = a[k1 + 1];
+                a[j1] = yr;
+                a[j1 + 1] = yi;
+                a[k1] = xr;
+                a[k1 + 1] = xi;
+                j1 += m2;
+                k1 += m2;
+                xr = a[j1];
+                xi = a[j1 + 1];
+                yr = a[k1];
+                yi = a[k1 + 1];
+                a[j1] = yr;
+                a[j1 + 1] = yi;
+                a[k1] = xr;
+                a[k1 + 1] = xi;
             }
-        }
     }
 
     private static void cftfsub(int n, double[] a, double[] w)
@@ -274,8 +267,8 @@ public class RealFFT
                 l <<= 2;
             }
         }
+
         if (l << 2 == n)
-        {
             for (j = 0; j < l; j += 2)
             {
                 j1 = j + l;
@@ -298,9 +291,7 @@ public class RealFFT
                 a[j3] = x1r + x3i;
                 a[j3 + 1] = x1i - x3r;
             }
-        }
         else
-        {
             for (j = 0; j < l; j += 2)
             {
                 j1 = j + l;
@@ -311,7 +302,6 @@ public class RealFFT
                 a[j1] = x0r;
                 a[j1 + 1] = x0i;
             }
-        }
     }
 
     private static void cftbsub(int n, double[] a, double[] w)
@@ -330,8 +320,8 @@ public class RealFFT
                 l <<= 2;
             }
         }
+
         if (l << 2 == n)
-        {
             for (j = 0; j < l; j += 2)
             {
                 j1 = j + l;
@@ -354,9 +344,7 @@ public class RealFFT
                 a[j3] = x1r + x3i;
                 a[j3 + 1] = x1i + x3r;
             }
-        }
         else
-        {
             for (j = 0; j < l; j += 2)
             {
                 j1 = j + l;
@@ -367,7 +355,6 @@ public class RealFFT
                 a[j1] = x0r;
                 a[j1 + 1] = x0i;
             }
-        }
     }
 
     private static void cft1st(int n, double[] a, double[] w)
@@ -504,6 +491,7 @@ public class RealFFT
             a[j3] = x1r + x3i;
             a[j3 + 1] = x1i - x3r;
         }
+
         wk1r = w[2];
         for (j = m; j < l + m; j += 2)
         {
@@ -531,6 +519,7 @@ public class RealFFT
             a[j3] = wk1r * (x0i - x0r);
             a[j3 + 1] = wk1r * (x0i + x0r);
         }
+
         k1 = 0;
         m2 = 2 * m;
         for (k = m2; k < n; k += m2)
@@ -571,6 +560,7 @@ public class RealFFT
                 a[j3] = wk3r * x0r - wk3i * x0i;
                 a[j3 + 1] = wk3r * x0i + wk3i * x0r;
             }
+
             wk1r = w[k2 + 2];
             wk1i = w[k2 + 3];
             wk3r = wk1r - 2 * wk2r * wk1i;
@@ -655,6 +645,7 @@ public class RealFFT
             a[k] += yr;
             a[k + 1] = yi - a[k + 1];
         }
+
         a[m + 1] = -a[m + 1];
     }
 }

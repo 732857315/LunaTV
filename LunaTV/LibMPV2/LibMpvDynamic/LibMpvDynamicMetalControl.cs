@@ -1,14 +1,15 @@
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
+using LunaTV.LibMpv2.LibMpvDynamic;
 
-namespace LunaTV.Logic.LibMpvDynamic;
+namespace LunaTV.LibMPV2.LibMpvDynamic;
 
 /// <summary>
 ///     macOS Metal-backed libmpv video control for Avalonia 12.
@@ -86,10 +87,9 @@ public class LibMpvDynamicMetalControl : NativeControlHost
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
-        IPlatformHandle handle = base.CreateNativeControlCore(parent);
+        var handle = base.CreateNativeControlCore(parent);
 
         if (!_isInitialized && Player != null)
-        {
             try
             {
                 InitializeMetalOnView(handle.Handle);
@@ -98,17 +98,13 @@ public class LibMpvDynamicMetalControl : NativeControlHost
             {
                 Debug.WriteLine($"[MetalControl] Init failed: {ex.Message}");
             }
-        }
 
         return handle;
     }
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
-        if (Player != null)
-        {
-            Player.RequestRender -= OnMpvRequestRender;
-        }
+        if (Player != null) Player.RequestRender -= OnMpvRequestRender;
 
         _isInitialized = false;
         base.DestroyNativeControlCore(control);
@@ -120,9 +116,7 @@ public class LibMpvDynamicMetalControl : NativeControlHost
 
         // Keep the Metal layer's drawable size in sync with the control's layout size.
         if (_isInitialized && _metalLayer != IntPtr.Zero && change.Property.Name == nameof(Bounds))
-        {
             UpdateDrawableSize();
-        }
     }
 
     // ── Setup ────────────────────────────────────────────────────────────
@@ -132,18 +126,14 @@ public class LibMpvDynamicMetalControl : NativeControlHost
         // 1. Get the default Metal device.
         _mtlDevice = MTLCreateSystemDefaultDevice();
         if (_mtlDevice == IntPtr.Zero)
-        {
             throw new InvalidOperationException("[MetalControl] MTLCreateSystemDefaultDevice returned NULL");
-        }
 
         // 2. Allocate and initialise a CAMetalLayer.
-        IntPtr cls = objc_getClass("CAMetalLayer");
-        IntPtr layerAlloc = msg_id(cls, sel_registerName("alloc"));
+        var cls = objc_getClass("CAMetalLayer");
+        var layerAlloc = msg_id(cls, sel_registerName("alloc"));
         _metalLayer = msg_id(layerAlloc, sel_registerName("init"));
         if (_metalLayer == IntPtr.Zero)
-        {
             throw new InvalidOperationException("[MetalControl] CAMetalLayer alloc/init returned NULL");
-        }
 
         // 3. Configure the layer.
         msg_void_id(_metalLayer, sel_registerName("setDevice:"), _mtlDevice);
@@ -153,8 +143,8 @@ public class LibMpvDynamicMetalControl : NativeControlHost
 
         // Sync HiDPI scale with the host window (may be 1.0 before a window exists,
         // but gets corrected on the next bounds change via UpdateDrawableSize).
-        IntPtr window = msg_id(nsView, sel_registerName("window"));
-        double scale = window != IntPtr.Zero
+        var window = msg_id(nsView, sel_registerName("window"));
+        var scale = window != IntPtr.Zero
             ? msg_double(window, sel_registerName("backingScaleFactor"))
             : 1.0;
         msg_void_double(_metalLayer, sel_registerName("setContentsScale:"), scale);
@@ -183,24 +173,15 @@ public class LibMpvDynamicMetalControl : NativeControlHost
     /// </summary>
     private void UpdateDrawableSize()
     {
-        if (_metalLayer == IntPtr.Zero)
-        {
-            return;
-        }
+        if (_metalLayer == IntPtr.Zero) return;
 
-        double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
-        int pixelWidth = (int)(Bounds.Width * scaling);
-        int pixelHeight = (int)(Bounds.Height * scaling);
+        var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        var pixelWidth = (int)(Bounds.Width * scaling);
+        var pixelHeight = (int)(Bounds.Height * scaling);
 
-        if (pixelWidth <= 0 || pixelHeight <= 0)
-        {
-            return;
-        }
+        if (pixelWidth <= 0 || pixelHeight <= 0) return;
 
-        if (pixelWidth == _lastPixelWidth && pixelHeight == _lastPixelHeight)
-        {
-            return;
-        }
+        if (pixelWidth == _lastPixelWidth && pixelHeight == _lastPixelHeight) return;
 
         _lastPixelWidth = pixelWidth;
         _lastPixelHeight = pixelHeight;
@@ -221,20 +202,14 @@ public class LibMpvDynamicMetalControl : NativeControlHost
 
     private void DoRender()
     {
-        if (!_isInitialized || Player == null || _metalLayer == IntPtr.Zero)
-        {
-            return;
-        }
+        if (!_isInitialized || Player == null || _metalLayer == IntPtr.Zero) return;
 
         // Keep drawable size up to date (guards against the first render
         // arriving before the first Bounds change notification).
         UpdateDrawableSize();
 
         // Nothing to show until a file is loaded.
-        if (string.IsNullOrEmpty(Player.FileName))
-        {
-            return;
-        }
+        if (string.IsNullOrEmpty(Player.FileName)) return;
 
         try
         {

@@ -1,6 +1,6 @@
 using SkiaSharp;
 
-namespace LunaTV.Logic.Media;
+namespace LunaTV.LibMPV2.Media;
 
 public static class TextToImageGenerator
 {
@@ -20,13 +20,14 @@ public static class TextToImageGenerator
     )
     {
         if (kerning == 0)
-        {
-            return GenerateImage(text, fontName, fontSize, isBold, textColor, outlineColor, shadowColor, backgroundColor, outlineWidth, shadowWidth, cornerRadius);
-        }
+            return GenerateImage(text, fontName, fontSize, isBold, textColor, outlineColor, shadowColor,
+                backgroundColor, outlineWidth, shadowWidth, cornerRadius);
 
         // Measure the total width of the text
         float xPosition = 0;
-        using SKTypeface? typeface = SKTypeface.FromFamilyName(fontName, isBold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+        using var typeface = SKTypeface.FromFamilyName(fontName,
+            isBold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal,
+            SKFontStyleSlant.Upright);
 
         var paint = new SKPaint
         {
@@ -35,7 +36,7 @@ public static class TextToImageGenerator
         };
 
         // Create a new SKBitmap with sufficient dimensions
-        using SKPaint? tempPaint = paint.Clone();
+        using var tempPaint = paint.Clone();
         var textBounds = new SKRect();
         var font = new SKFont
         {
@@ -49,14 +50,14 @@ public static class TextToImageGenerator
         font.MeasureText(text, out textBounds);
 
         //float baseline = -textBounds.Top;
-        font.GetFontMetrics(out SKFontMetrics metrics);
-        float baseline = -metrics.Ascent;
+        font.GetFontMetrics(out var metrics);
+        var baseline = -metrics.Ascent;
         //tempPaint.MeasureText(text, ref textBounds);
 
-        int bitmapWidth = (int)(textBounds.Width + kerning * text.Length);
-        int bitmapHeight = (int)(textBounds.Height + -metrics.Ascent);
+        var bitmapWidth = (int)(textBounds.Width + kerning * text.Length);
+        var bitmapHeight = (int)(textBounds.Height + -metrics.Ascent);
 
-        float spaceWidth = font.MeasureText(".");
+        var spaceWidth = font.MeasureText(".");
 
         var bitmap = new SKBitmap(bitmapWidth, bitmapHeight);
         using (var canvas = new SKCanvas(bitmap))
@@ -65,7 +66,7 @@ public static class TextToImageGenerator
             canvas.Clear(SKColors.Transparent);
 
             // Iterate over each glyph in the text
-            foreach (char glyph in text)
+            foreach (var glyph in text)
             {
                 if (glyph == ' ')
                 {
@@ -73,12 +74,12 @@ public static class TextToImageGenerator
                     continue;
                 }
 
-                string singleGlyph = glyph.ToString();
+                var singleGlyph = glyph.ToString();
 
                 // Measure the width of the current glyph
                 //float glyphWidth = tempPaint.MeasureText(singleGlyph);
                 font.MeasureText(singleGlyph, out textBounds);
-                float glyphWidth = textBounds.Width;
+                var glyphWidth = textBounds.Width;
 
                 // Draw the glyph at the current position
                 canvas.DrawText(singleGlyph, xPosition, baseline, SKTextAlign.Left, font, paint);
@@ -108,41 +109,44 @@ public static class TextToImageGenerator
     {
         outlineWidth *= 1.7f; // factor to match ASSA
 
-        using SKTypeface? typeface = SKTypeface.FromFamilyName(fontName, isBold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+        using var typeface = SKTypeface.FromFamilyName(fontName,
+            isBold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal,
+            SKFontStyleSlant.Upright);
         using var paint = new SKPaint
         {
             IsAntialias = true
         };
 
         using var font = new SKFont(typeface, fontSize);
-        font.MeasureText(text, out SKRect textBounds, paint);
+        font.MeasureText(text, out var textBounds, paint);
 
-        int width = (int)(textBounds.Width + padding * 2 + outlineWidth * 2 + shadowWidth);
-        int height = (int)(textBounds.Height + padding * 2 + outlineWidth * 2 + shadowWidth);
+        var width = (int)(textBounds.Width + padding * 2 + outlineWidth * 2 + shadowWidth);
+        var height = (int)(textBounds.Height + padding * 2 + outlineWidth * 2 + shadowWidth);
 
         var bitmap = new SKBitmap(width, height);
         using var canvas = new SKCanvas(bitmap);
         canvas.Clear(backgroundColor);
 
-        float x = padding + outlineWidth;
-        float y = height - padding - outlineWidth;
+        var x = padding + outlineWidth;
+        var y = height - padding - outlineWidth;
 
         // Create a path for the text
-        using SKPath? textPath = font.GetTextPath(text, new SKPoint(x, y));
+        using var textPath = font.GetTextPath(text, new SKPoint(x, y));
 
         // Draw shadow (includes both text and outline with rounded corners)
         if (shadowWidth > 0)
-        {
-            DrawTextWithRoundedOutline(x + shadowWidth, y + shadowWidth, shadowColor, shadowColor, textPath, x, y, cornerRadius, outlineWidth, paint, canvas);
-        }
+            DrawTextWithRoundedOutline(x + shadowWidth, y + shadowWidth, shadowColor, shadowColor, textPath, x, y,
+                cornerRadius, outlineWidth, paint, canvas);
 
         // Draw main text with rounded outline
-        DrawTextWithRoundedOutline(x, y, textColor, outlineColor, textPath, x, y, cornerRadius, outlineWidth, paint, canvas);
+        DrawTextWithRoundedOutline(x, y, textColor, outlineColor, textPath, x, y, cornerRadius, outlineWidth, paint,
+            canvas);
 
         return bitmap;
     }
 
-    private static void DrawTextWithRoundedOutline(float xPos, float yPos, SKColor fillColor, SKColor strokeColor, SKPath textPath, float x, float y, float cornerRadius, float outlineWidth, SKPaint paint,
+    private static void DrawTextWithRoundedOutline(float xPos, float yPos, SKColor fillColor, SKColor strokeColor,
+        SKPath textPath, float x, float y, float cornerRadius, float outlineWidth, SKPaint paint,
         SKCanvas canvas)
     {
         // Translate the path to the current position
@@ -171,15 +175,15 @@ public static class TextToImageGenerator
 
     public static SKBitmap AddShadowToBitmap(SKBitmap originalBitmap, int shadowWidth, SKColor shadowColor)
     {
-        int offset = 2;
+        var offset = 2;
 
         // Calculate new dimensions
-        int newWidth = originalBitmap.Width + shadowWidth + offset;
-        int newHeight = originalBitmap.Height + shadowWidth + offset;
+        var newWidth = originalBitmap.Width + shadowWidth + offset;
+        var newHeight = originalBitmap.Height + shadowWidth + offset;
 
         // Create a new bitmap with increased size
         using var surface = SKSurface.Create(new SKImageInfo(newWidth, newHeight));
-        SKCanvas? canvas = surface.Canvas;
+        var canvas = surface.Canvas;
 
         // Clear the canvas with transparent color
         canvas.Clear(SKColors.Transparent);
@@ -202,7 +206,7 @@ public static class TextToImageGenerator
         canvas.DrawBitmap(originalBitmap, 0, 0);
 
         // Create a new bitmap from the surface
-        using (SKImage? image = surface.Snapshot())
+        using (var image = surface.Snapshot())
         {
             return SKBitmap.FromImage(image);
         }

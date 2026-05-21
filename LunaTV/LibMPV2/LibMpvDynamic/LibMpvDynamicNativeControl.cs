@@ -1,14 +1,16 @@
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Timers;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Timers;
+using LunaTV.LibMpv2.LibMpvDynamic;
+using LunaTV.Logic.LibMpvDynamic;
 
-namespace LunaTV.Logic.LibMpvDynamic;
+namespace LunaTV.LibMPV2.LibMpvDynamic;
 
 public class LibMpvDynamicNativeControl : NativeControlHost
 {
@@ -66,25 +68,21 @@ public class LibMpvDynamicNativeControl : NativeControlHost
     {
         base.OnPropertyChanged(change);
 
-        if (ShouldHideNativeControlDuringResize && change.Property.Name == nameof(Bounds) && _isInitialized && Player != null)
+        if (ShouldHideNativeControlDuringResize && change.Property.Name == nameof(Bounds) && _isInitialized &&
+            Player != null)
         {
             var newBounds = (Rect)change.NewValue!;
             var oldBounds = (Rect)(change.OldValue ?? new Rect());
 
             if (Math.Abs(newBounds.Width - oldBounds.Width) > 1 ||
                 Math.Abs(newBounds.Height - oldBounds.Height) > 1)
-            {
                 OnResizeStarted();
-            }
         }
     }
 
     private void OnResizeStarted()
     {
-        if (!ShouldHideNativeControlDuringResize)
-        {
-            return;
-        }
+        if (!ShouldHideNativeControlDuringResize) return;
 
         if (!_isResizing && Player != null)
         {
@@ -98,10 +96,7 @@ public class LibMpvDynamicNativeControl : NativeControlHost
 
     private void OnResizeFinished(object? sender, ElapsedEventArgs e)
     {
-        if (!ShouldHideNativeControlDuringResize)
-        {
-            return;
-        }
+        if (!ShouldHideNativeControlDuringResize) return;
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -116,10 +111,9 @@ public class LibMpvDynamicNativeControl : NativeControlHost
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
         _nativeHandle = CreateRenderTargetHandle(parent.Handle);
-        string? handleDescriptor = _ownedChildHandle != IntPtr.Zero ? "HWND" : parent.HandleDescriptor;
+        var handleDescriptor = _ownedChildHandle != IntPtr.Zero ? "HWND" : parent.HandleDescriptor;
 
         if (!_isInitialized && Player != null)
-        {
             try
             {
                 Player.PlayerSubName = "wid";
@@ -134,7 +128,6 @@ public class LibMpvDynamicNativeControl : NativeControlHost
             {
                 Debug.WriteLine($"Failed to initialize MpvPlayer: {ex.Message}");
             }
-        }
 
         return new PlatformHandle(_nativeHandle, handleDescriptor);
     }
@@ -157,6 +150,7 @@ public class LibMpvDynamicNativeControl : NativeControlHost
                 _originalWndProc = IntPtr.Zero;
                 _customWndProc = null;
             }
+
             DestroyWindow(_ownedChildHandle);
             _ownedChildHandle = IntPtr.Zero;
         }
@@ -169,10 +163,7 @@ public class LibMpvDynamicNativeControl : NativeControlHost
 
     private IntPtr CreateRenderTargetHandle(IntPtr parentHandle)
     {
-        if (!ShouldUseOwnedChildHandle)
-        {
-            return parentHandle;
-        }
+        if (!ShouldUseOwnedChildHandle) return parentHandle;
 
         _ownedChildHandle = CreateWindowExW(
             0,
@@ -190,13 +181,14 @@ public class LibMpvDynamicNativeControl : NativeControlHost
 
         if (_ownedChildHandle == IntPtr.Zero)
         {
-            int error = Marshal.GetLastWin32Error();
+            var error = Marshal.GetLastWin32Error();
             Debug.WriteLine($"Failed to create mpv child host window: {error}. Falling back to parent handle.");
             return parentHandle;
         }
 
         _customWndProc = CustomWndProc;
-        _originalWndProc = SetWindowLongPtr(_ownedChildHandle, GWLP_WNDPROC, Marshal.GetFunctionPointerForDelegate(_customWndProc));
+        _originalWndProc = SetWindowLongPtr(_ownedChildHandle, GWLP_WNDPROC,
+            Marshal.GetFunctionPointerForDelegate(_customWndProc));
 
         // Show the window only after the WndProc is installed so the very first
         // WM_ERASEBKGND is caught by our handler and paints black (not white).
@@ -207,30 +199,20 @@ public class LibMpvDynamicNativeControl : NativeControlHost
 
     private void InitializeWithNativeWindow(IntPtr windowHandle)
     {
-        if (Player == null)
-        {
-            return;
-        }
+        if (Player == null) return;
 
         Player.LoadLib();
 
-        string widString = GetWindowIdString(windowHandle);
+        var widString = GetWindowIdString(windowHandle);
         Debug.WriteLine($"Setting wid to: {widString}");
 
-        int err = Player.SetOptionString("wid", widString);
-        if (err < 0)
-        {
-            Debug.WriteLine($"Failed to set wid: {Player.GetErrorString(err)}");
-        }
+        var err = Player.SetOptionString("wid", widString);
+        if (err < 0) Debug.WriteLine($"Failed to set wid: {Player.GetErrorString(err)}");
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
             Player.SetOptionString("vo", "xv,x11,gpu");
-        }
         else
-        {
             Player.SetOptionString("vo", "gpu");
-        }
 
         Player.SetOptionString("sid", "no");
         Player.SetOptionString("keep-open", "always");
@@ -243,10 +225,7 @@ public class LibMpvDynamicNativeControl : NativeControlHost
         }
 
         err = Player.Initialize();
-        if (err < 0)
-        {
-            throw new InvalidOperationException($"Failed to initialize mpv: {Player.GetErrorString(err)}");
-        }
+        if (err < 0) throw new InvalidOperationException($"Failed to initialize mpv: {Player.GetErrorString(err)}");
 
         Dispatcher.UIThread.Post(() =>
         {
@@ -257,18 +236,9 @@ public class LibMpvDynamicNativeControl : NativeControlHost
 
     private static string GetWindowIdString(IntPtr handle)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            return handle.ToString();
-        }
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            return handle.ToString();
-        }
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            return handle.ToString();
-        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return handle.ToString();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return handle.ToString();
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return handle.ToString();
 
         return handle.ToString();
     }
@@ -299,7 +269,8 @@ public class LibMpvDynamicNativeControl : NativeControlHost
     private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
     [DllImport("user32.dll")]
-    private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+    private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam,
+        IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern bool GetClientRect(IntPtr hWnd, ref RECT lpRect);
@@ -322,54 +293,48 @@ public class LibMpvDynamicNativeControl : NativeControlHost
     private IntPtr CustomWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
         if (msg == WM_NCHITTEST)
-        {
             // The STATIC window class returns HTTRANSPARENT by default, which forwards
             // all mouse messages to the parent HWND before they reach this WndProc.
             // Returning HTCLIENT makes the window opaque to mouse input so that
             // WM_LBUTTONDOWN is actually delivered here.
             return new IntPtr(HTCLIENT);
-        }
         if (msg == WM_ERASEBKGND)
         {
             if (!string.IsNullOrEmpty(Player?.FileName))
-            {
                 return CallWindowProc(_originalWndProc, hWnd, msg, wParam, lParam);
-            }
             // Paint the background black so the window is never white when mpv hasn't rendered yet.
-            IntPtr hdc = wParam;
+            var hdc = wParam;
             var rc = new RECT();
             GetClientRect(hWnd, ref rc);
-            IntPtr brush = CreateSolidBrush(0x00000000); // black
+            var brush = CreateSolidBrush(0x00000000); // black
             FillRect(hdc, ref rc, brush);
             DeleteObject(brush);
             return new IntPtr(1); // non-zero = we handled it
         }
+
         if (msg == WM_PAINT)
         {
             if (!string.IsNullOrEmpty(Player?.FileName))
-            {
                 return CallWindowProc(_originalWndProc, hWnd, msg, wParam, lParam);
-            }
             // The STATIC default WM_PAINT handler paints the class background (white)
             // on top of anything WM_ERASEBKGND drew. Handle WM_PAINT ourselves:
             // validate the region and fill black so mpv starts on a black canvas.
             PAINTSTRUCT ps = default;
-            IntPtr hdc = BeginPaint(hWnd, ref ps);
+            var hdc = BeginPaint(hWnd, ref ps);
             if (hdc != IntPtr.Zero)
             {
                 var rc = new RECT();
                 GetClientRect(hWnd, ref rc);
-                IntPtr brush = CreateSolidBrush(0x00000000);
+                var brush = CreateSolidBrush(0x00000000);
                 FillRect(hdc, ref rc, brush);
                 DeleteObject(brush);
                 EndPaint(hWnd, ref ps);
             }
+
             return IntPtr.Zero;
         }
-        if (msg == WM_LBUTTONDOWN)
-        {
-            Dispatcher.UIThread.Post(TogglePlayPause);
-        }
+
+        if (msg == WM_LBUTTONDOWN) Dispatcher.UIThread.Post(TogglePlayPause);
         return CallWindowProc(_originalWndProc, hWnd, msg, wParam, lParam);
     }
 
