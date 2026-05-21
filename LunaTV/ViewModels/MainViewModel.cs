@@ -1,4 +1,7 @@
-﻿using Avalonia.Controls;
+﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using Avalonia.Controls;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,9 +13,6 @@ using LunaTV.ViewModels.Base;
 using LunaTV.ViewModels.TVShowPages;
 using LunaTV.Views.TVShowPages;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
 
 namespace LunaTV.ViewModels;
 
@@ -36,6 +36,10 @@ public partial class MainViewModel : ViewModelBase
         {
             DataContext = new TVShowHistoryViewModel()
         },
+        ["下载"] = new TVDownloadView
+        {
+            DataContext = new TVDownloadViewModel()
+        },
         ["配置"] = new TVShowSettingView
         {
             DataContext = new TVShowSettingViewModel()
@@ -57,12 +61,12 @@ public partial class MainViewModel : ViewModelBase
             new()
             {
                 Name = "首页",
-                Data = App.TopLevel.TryFindResource("SemiIconHome", out object? value1) ? (StreamGeometry)value1 : null
+                Data = App.TopLevel.TryFindResource("SemiIconHome", out var value1) ? (StreamGeometry)value1 : null
             },
             new()
             {
                 Name = "搜索",
-                Data = App.TopLevel.TryFindResource("SemiIconSearch", out object? value2) ? (StreamGeometry)value2 : null
+                Data = App.TopLevel.TryFindResource("SemiIconSearch", out var value2) ? (StreamGeometry)value2 : null
             },
             // new()
             // {
@@ -72,17 +76,17 @@ public partial class MainViewModel : ViewModelBase
             new()
             {
                 Name = "历史",
-                Data = App.TopLevel.TryFindResource("SemiIconHistory", out object? value4) ? (StreamGeometry)value4 : null
+                Data = App.TopLevel.TryFindResource("SemiIconHistory", out var value4) ? (StreamGeometry)value4 : null
             },
             new()
             {
                 Name = "下载",
-                Data = App.TopLevel.TryFindResource("SemiIconDownload", out object? value5) ? (StreamGeometry)value5 : null
+                Data = App.TopLevel.TryFindResource("SemiIconDownload", out var value5) ? (StreamGeometry)value5 : null
             },
             new()
             {
                 Name = "配置",
-                Data = App.TopLevel.TryFindResource("SemiIconSetting", out object? value6) ? (StreamGeometry)value6 : null
+                Data = App.TopLevel.TryFindResource("SemiIconSetting", out var value6) ? (StreamGeometry)value6 : null
             }
         };
         SelectedItem = Items[0];
@@ -111,17 +115,18 @@ public partial class MainViewModel : ViewModelBase
     private void ToView(string content)
     {
         if (string.IsNullOrEmpty(content)) return;
-        if (_viewDictionary.TryGetValue(content, out UserControl? control))
-        {
+        if (_viewDictionary.TryGetValue(content, out var control))
             PageContent = control;
-        }
         else
-        {
             PageContent = content switch
             {
                 "历史" => new TVShowHistoryView
                 {
                     DataContext = new TVShowHistoryViewModel()
+                },
+                "下载" => new TVDownloadView
+                {
+                    DataContext = new TVDownloadViewModel()
                 },
                 "配置" => new TVShowSettingView
                 {
@@ -129,7 +134,6 @@ public partial class MainViewModel : ViewModelBase
                 },
                 _ => null
             };
-        }
     }
 
     public UserControl GetControl(string name)

@@ -40,17 +40,6 @@
     <ItemGroup>
         <ProjectReference Include="..\LibMPV\LibMpv.Avalonia\LibMpv.Avalonia.csproj"/>
         <ProjectReference Include="..\LunaTV.Base\LunaTV.Base.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Folder Include="Exceptions\"/>
-        <None Include="wwwroot\**">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
-    <ItemGroup>
-        <Compile Remove="Assets\wwwroot\**"/>
-        <AvaloniaResource Remove="Assets\wwwroot\**"/>
+        <ProjectReference Include="..\M3U8Download\M3U8Download.csproj"/>
     </ItemGroup>
 </Project>

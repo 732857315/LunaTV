@@ -2,7 +2,6 @@
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using CommunityToolkit.Mvvm.Messaging;
 using LunaTV.Base.Api;
 using LunaTV.Base.Constants;
 using LunaTV.Base.DB;
@@ -123,7 +122,11 @@ public static class ServiceCollectionExtenstion
         // 主窗口
         serviceCollection.AddSingleton<MainWindow>();
         serviceCollection.AddSingleton<MainView>();
-        serviceCollection.AddTransient<SettingsView>();
+        serviceCollection.AddTransient<SettingsView>(provider =>
+            new SettingsView
+            {
+                DataContext = provider.GetRequiredService<SettingsViewModel>()
+            });
     }
 
     /// <summary>

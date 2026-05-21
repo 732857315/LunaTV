@@ -1,0 +1,246 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Avalonia.Collections;
+using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using LunaTV.Base.DB.UnitOfWork;
+using LunaTV.Base.Models;
+using LunaTV.Constants;
+using LunaTV.ViewModels.Base;
+using M3U8Download;
+using Microsoft.Extensions.DependencyInjection;
+using N_m3u8DL_RE.Util;
+
+namespace LunaTV.ViewModels.TVShowPages;
+
+public partial class TVDownloadViewModel : ViewModelBase
+{
+    private readonly DownloadManager? _downloadManager;
+
+    private readonly DispatcherTimer _downloadTimer;
+    private readonly SugarRepository<MediaDownload> _mediaDownloadTable;
+
+    [ObservableProperty] private int _downloadingCount;
+    [ObservableProperty] private string _downloadUrl = "https://vod.360zyx.vip/20250708/7T2xjBRd/index.m3u8";
+    private bool _isDownloading;
+    [ObservableProperty] private string _remainingTime = "--:--:--";
+    [ObservableProperty] private string _sizeStr = "--:--/--:--";
+    [ObservableProperty] private string _speed = "0:00MBps";
+    [ObservableProperty] private int _totalCount;
+    [ObservableProperty] private int _waitingCount;
+
+    public TVDownloadViewModel()
+    {
+        _mediaDownloadTable = App.Services.GetRequiredService<SugarRepository<MediaDownload>>();
+        MediaDownloadViewModels = new ObservableCollection<MediaDownloadViewModel>();
+
+        MediaDownloads = new DataGridCollectionView(MediaDownloadViewModels);
+        MediaDownloads.GroupDescriptions.Add(new DataGridPathGroupDescription("Name"));
+
+        _downloadManager = new DownloadManager();
+        if (OperatingSystem.IsWindows()) _downloadManager.SetFFmpegPath(GlobalDefine.FFmpegPath);
+
+        // check ffmpeg
+
+        // task
+        WaitList = new Queue<int>();
+        _downloadTimer = new DispatcherTimer
+            (TimeSpan.FromSeconds(1), DispatcherPriority.Background, DownloadTimerOnTick);
+        _downloadTimer.Start();
+    }
+
+    public DataGridCollectionView MediaDownloads { get; set; }
+    public ObservableCollection<MediaDownloadViewModel> MediaDownloadViewModels { get; set; }
+    private Queue<int> WaitList { get; }
+
+    private async void DownloadTimerOnTick(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (!_isDownloading && WaitList.Count > 0)
+            {
+                var index = WaitList.Dequeue();
+                var mvm = MediaDownloadViewModels.FirstOrDefault(x => x.Id == index);
+
+                if (mvm != null) Downloading(mvm);
+            }
+
+            WaitingCount = WaitList.Count;
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine(exception);
+        }
+    }
+
+    ~TVDownloadViewModel()
+    {
+        _downloadTimer.Stop();
+    }
+
+    public void AddTvDownload(string name, string url, string episode, bool check = true)
+    {
+        var isDownload = false;
+        var id = 0;
+        if (check)
+        {
+            var mediaDownload = _mediaDownloadTable.GetSingle(md => md.Url == url);
+            if (mediaDownload != null)
+            {
+                id = mediaDownload.Id;
+                isDownload = mediaDownload.IsDownloaded;
+            }
+        }
+
+        MediaDownloadViewModels.Add(new MediaDownloadViewModel
+        {
+            Id = id,
+            Name = name,
+            Episode = episode,
+            Url = url,
+            IsDownloaded = isDownload,
+            LocalPath = Path.Combine(GlobalDefine.DownloadPath, name),
+            ActionIndicate = false,
+            ActionText = isDownload ? "重新下载" : "开始",
+            Status = "未开始",
+            StatusIndicate = false,
+            Progress = 0
+        });
+
+        var md = new MediaDownload
+        {
+            Id = id,
+            Source = string.Empty,
+            Name = name,
+            Episode = episode,
+            Url = url,
+            IsDownloaded = isDownload,
+            LocalPath = GlobalDefine.DownloadPath
+        };
+
+        _mediaDownloadTable.InsertOrUpdate(md);
+
+        TotalCount += 1;
+        WaitingCount += 1;
+        if (!isDownload) WaitList.Enqueue(md.Id);
+    }
+
+    public void AddMovieDownload(string name, string url, bool check = true)
+    {
+        AddTvDownload(name, url, string.Empty, check);
+    }
+
+    private bool Downloading(MediaDownloadViewModel mdvm)
+    {
+        _isDownloading = true;
+        // 开始下载
+        var timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+
+        timer.Tick += (_, _) =>
+        {
+            if (_downloadManager!.DownloadStatus.Count > 0)
+            {
+                Speed = _downloadManager.DownloadStatus[0].speed;
+                SizeStr = _downloadManager.DownloadStatus[0].sizeStr;
+                RemainingTime = _downloadManager.DownloadStatus[0].remainingTimeStr;
+            }
+        };
+        DownloadingCount = 1;
+        timer.Start();
+        var fileName = string.IsNullOrEmpty(mdvm.Episode) ? $"{mdvm.Name}-{mdvm.Episode}" : $"{mdvm.Name}";
+        var result = Task.Run(async () =>
+        {
+            await _downloadManager!.DownloadAsync(mdvm.Url!, mdvm.LocalPath!, fileName);
+            _isDownloading = false;
+        });
+
+        Console.WriteLine("122222222222222222222222222222");
+        timer.Stop();
+        if (_downloadManager!.DownloadStatus.Count > 0)
+        {
+            Speed = _downloadManager.DownloadStatus[0].speed;
+            SizeStr = _downloadManager.DownloadStatus[0].sizeStr;
+            RemainingTime = _downloadManager.DownloadStatus[0].remainingTimeStr;
+        }
+
+        DownloadingCount = 0;
+        return true;
+    }
+
+    [RelayCommand]
+    private void DownloadAction()
+    {
+        // 外部资源下载
+        AddMovieDownload(OtherUtil.GetFileNameFromInput(DownloadUrl), DownloadUrl);
+    }
+}
+
+public partial class MediaDownloadViewModel : ObservableObject
+{
+    [ObservableProperty] private bool _actionIndicate; // 动作指示
+    [ObservableProperty] private string? _actionText = "开始"; // 状态 开始/暂停/重新下载
+    [ObservableProperty] private string? _localPath; // 本地地址
+    [ObservableProperty] private int _progress;
+    [ObservableProperty] private string? _status = "未开始";
+    [ObservableProperty] private bool _statusIndicate; // 状态指示
+    public int Id { get; set; }
+    public string? Name { get; set; } //电影名
+    public string? Episode { get; set; } //剧集
+    public string? Url { get; set; } //播放地址
+    public bool IsDownloaded { get; set; } // 本地地址
+    public DateTime UpdateTime { get; set; }
+
+    partial void OnActionTextChanged(string? value)
+    {
+        Status = value switch
+        {
+            "开始" => "未开始",
+            "暂停" => "下载中",
+            "重新下载" => "已完成",
+            _ => "未开始"
+        };
+
+        IsDownloaded = Status == "已完成";
+        ActionIndicate = Status != "未开始";
+        StatusIndicate = Status == "下载中";
+    }
+
+    [RelayCommand]
+    private void DownloadAction()
+    {
+        ActionText = ActionText switch
+        {
+            "开始" => "暂停",
+            "暂停" => "重新下载",
+            "重新下载" => "开始",
+            _ => "开始"
+        };
+    }
+
+    [RelayCommand]
+    public void OpenFolder()
+    {
+        if (string.IsNullOrEmpty(LocalPath)) return;
+
+        try
+        {
+            if (OperatingSystem.IsWindows())
+                Process.Start("explorer.exe", LocalPath);
+            else
+                Process.Start("open", LocalPath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+}

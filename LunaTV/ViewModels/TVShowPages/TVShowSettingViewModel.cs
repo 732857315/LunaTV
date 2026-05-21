@@ -1,18 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
 using System.Threading.Tasks;
-using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LunaTV.Base.Constants;
 using LunaTV.Base.DB.UnitOfWork;
 using LunaTV.Base.Models;
 using LunaTV.Constants;
@@ -27,23 +24,23 @@ namespace LunaTV.ViewModels.TVShowPages;
 
 public partial class TVShowSettingViewModel : ViewModelBase
 {
-    [ObservableProperty] private ObservableCollection<ApiSourceItem> _commonApis;
-    [ObservableProperty] private ObservableCollection<ApiSourceItem> _adultApis;
-    [ObservableProperty] private ObservableCollection<ApiNetItem> _apiNets;
-    [ObservableProperty] private ObservableCollection<ApiCustomItem> _apiCustoms;
-    [ObservableProperty] private int _selectedApiCount;
-
-    [ObservableProperty] private bool _doubanApiEnabled;
-    [ObservableProperty] private bool _homeAutoLoadDoubanEnabled;
-    [ObservableProperty] private bool _forceBaseApiNeedChecked;
-
     private readonly SugarRepository<ApiSource> _apiSourceTable;
     private readonly SugarRepository<PlayerConfig> _playConfigTable;
+    [ObservableProperty] private ObservableCollection<ApiSourceItem> _adultApis;
+    [ObservableProperty] private ObservableCollection<ApiCustomItem> _apiCustoms;
+    [ObservableProperty] private ObservableCollection<ApiNetItem> _apiNets;
+    [ObservableProperty] private ObservableCollection<ApiSourceItem> _commonApis;
+
+    [ObservableProperty] private bool _doubanApiEnabled;
+    [ObservableProperty] private bool _forceBaseApiNeedChecked;
+    [ObservableProperty] private bool _homeAutoLoadDoubanEnabled;
+    [ObservableProperty] private int _selectedApiCount;
 
     public TVShowSettingViewModel()
     {
         _apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
         _playConfigTable = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>();
+        SystemSettings = App.Services.GetRequiredService<SettingsView>();
 
         CommonApis = new ObservableCollection<ApiSourceItem>();
         AdultApis = new ObservableCollection<ApiSourceItem>();
@@ -53,6 +50,8 @@ public partial class TVShowSettingViewModel : ViewModelBase
         RefreshSource();
     }
 
+    public object SystemSettings { get; set; }
+
     private void RefreshSource()
     {
         DoubanApiEnabled = AppConifg.PlayerConfig.DoubanApiEnabled;
@@ -60,8 +59,8 @@ public partial class TVShowSettingViewModel : ViewModelBase
         ForceBaseApiNeedChecked = AppConifg.PlayerConfig.ForceApiNeedSpecialSource;
 
         var apiSources = _apiSourceTable.GetList();
-        int index = 0;
-        int netIndex = 0;
+        var index = 0;
+        var netIndex = 0;
         CommonApis.Clear();
         AdultApis.Clear();
         ApiNets.Clear();
@@ -70,27 +69,23 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             index += api.IsEnable ? 1 : 0;
             if (api.IsAdult)
-            {
                 AdultApis.Add(new ApiSourceItem
                 {
                     Id = api.Id,
                     Source = api.Source,
                     Name = api.Name,
                     Enable = api.IsEnable,
-                    IsCustom = api.IsCustomApi,
+                    IsCustom = api.IsCustomApi
                 });
-            }
             else
-            {
                 CommonApis.Add(new ApiSourceItem
                 {
                     Id = api.Id,
                     Source = api.Source,
                     Name = api.Name,
                     Enable = api.IsEnable,
-                    IsCustom = api.IsCustomApi,
+                    IsCustom = api.IsCustomApi
                 });
-            }
 
             ApiNets.Add(new ApiNetItem
             {
@@ -98,19 +93,17 @@ public partial class TVShowSettingViewModel : ViewModelBase
                 IndexId = ++netIndex,
                 Name = api.Name,
                 Url = api.ApiBaseUrl,
-                IsAdult = api.IsAdult,
+                IsAdult = api.IsAdult
             });
 
             if (api.IsCustomApi)
-            {
-                ApiCustoms.Add(new ApiCustomItem()
+                ApiCustoms.Add(new ApiCustomItem
                 {
                     Id = api.Id,
                     Source = api.Source,
                     Name = api.Name,
                     IsAdult = api.IsAdult
                 });
-            }
         }
 
         SelectedApiCount = index;
@@ -120,15 +113,11 @@ public partial class TVShowSettingViewModel : ViewModelBase
     private void SelectApi(ApiSourceItem api)
     {
         if (api.Enable)
-        {
             AppConifg.SelectApis.Add(api.Source);
-        }
         else
-        {
             AppConifg.SelectApis.Remove(api.Source);
-        }
 
-        _apiSourceTable.Update(it => new ApiSource()
+        _apiSourceTable.Update(it => new ApiSource
         {
             IsEnable = api.Enable
         }, it => it.Id == api.Id);
@@ -140,15 +129,11 @@ public partial class TVShowSettingViewModel : ViewModelBase
     private void SelectAdultApi(ApiSourceItem api)
     {
         if (api.Enable)
-        {
             AppConifg.SelectAdultApis.Add(api.Source);
-        }
         else
-        {
             AppConifg.SelectAdultApis.Remove(api.Source);
-        }
 
-        _apiSourceTable.Update(it => new ApiSource()
+        _apiSourceTable.Update(it => new ApiSource
         {
             IsEnable = api.Enable
         }, it => it.Id == api.Id);
@@ -163,7 +148,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             if (api.Enable) continue;
             api.Enable = true;
-            _apiSourceTable.Update(it => new ApiSource()
+            _apiSourceTable.Update(it => new ApiSource
             {
                 IsEnable = api.Enable
             }, it => it.Id == api.Id);
@@ -173,7 +158,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             if (api.Enable) continue;
             api.Enable = true;
-            _apiSourceTable.Update(it => new ApiSource()
+            _apiSourceTable.Update(it => new ApiSource
             {
                 IsEnable = api.Enable
             }, it => it.Id == api.Id);
@@ -189,7 +174,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             if (!api.Enable) continue;
             api.Enable = false;
-            _apiSourceTable.Update(it => new ApiSource()
+            _apiSourceTable.Update(it => new ApiSource
             {
                 IsEnable = api.Enable
             }, it => it.Id == api.Id);
@@ -199,7 +184,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             if (!api.Enable) continue;
             api.Enable = false;
-            _apiSourceTable.Update(it => new ApiSource()
+            _apiSourceTable.Update(it => new ApiSource
             {
                 IsEnable = api.Enable
             }, it => it.Id == api.Id);
@@ -215,7 +200,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             if (api.Enable) continue;
             api.Enable = true;
-            _apiSourceTable.Update(it => new ApiSource()
+            _apiSourceTable.Update(it => new ApiSource
             {
                 IsEnable = api.Enable
             }, it => it.Id == api.Id);
@@ -225,7 +210,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             if (!api.Enable) continue;
             api.Enable = false;
-            _apiSourceTable.Update(it => new ApiSource()
+            _apiSourceTable.Update(it => new ApiSource
             {
                 IsEnable = api.Enable
             }, it => it.Id == api.Id);
@@ -254,14 +239,14 @@ public partial class TVShowSettingViewModel : ViewModelBase
                         Patterns = new[] { "*" }
                     }
                 },
-                SuggestedFileName = "lunatv-settings.json",
+                SuggestedFileName = "lunatv-settings.json"
             });
 
         if (filePath != null)
         {
             var apiSources = await _apiSourceTable.GetListAsync();
 
-            Dictionary<string, object> apiSourcesDict = new Dictionary<string, object>();
+            var apiSourcesDict = new Dictionary<string, object>();
             apiSourcesDict.Add("Version", typeof(App).Assembly.GetName().Version?.ToString());
             apiSourcesDict.Add("ApiSource", apiSources);
 
@@ -269,7 +254,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
             var settings = JsonSerializer.Serialize(apiSourcesDict, new JsonSerializerOptions
             {
                 WriteIndented = true,
-                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
             });
 
             // 写入文件
@@ -283,7 +268,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
     private async Task ImportSettings()
     {
         var filePath = await App.StorageProvider.OpenFilePickerAsync(
-            new FilePickerOpenOptions()
+            new FilePickerOpenOptions
             {
                 Title = "导出配置文件",
                 AllowMultiple = false,
@@ -315,10 +300,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
 
                 var apiSources = JsonSerializer.Deserialize<List<ApiSource>>(apiSourcesObj.ToString());
                 if (apiSources == null) return;
-                foreach (var apiSource in apiSources)
-                {
-                    await _apiSourceTable.InsertAsync(apiSource);
-                }
+                foreach (var apiSource in apiSources) await _apiSourceTable.InsertAsync(apiSource);
             }
 
             if (apiSourcesDict.TryGetValue("Version", out var versionObj))
@@ -345,7 +327,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
             StartupLocation = WindowStartupLocation.CenterScreen,
             CanDragMove = true,
             CanResize = false,
-            StyleClass = "",
+            StyleClass = ""
         };
 
 
@@ -372,7 +354,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
                 return;
             }
 
-            if (await _apiSourceTable.InsertAsync(new ApiSource()
+            if (await _apiSourceTable.InsertAsync(new ApiSource
                 {
                     Source = addCustomApiViewModel.ApiSource,
                     ApiBaseUrl = addCustomApiViewModel.ApiBaseUrl,
@@ -380,7 +362,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
                     Name = addCustomApiViewModel.ApiName,
                     IsAdult = addCustomApiViewModel.IsAdult,
                     IsCustomApi = true,
-                    IsEnable = false,
+                    IsEnable = false
                 }))
             {
                 App.Notification.Show(new Notification("成功", "添加新的自定义源成功", NotificationType.Success),
@@ -418,10 +400,10 @@ public partial class TVShowSettingViewModel : ViewModelBase
 
 public partial class ApiSourceItem : ObservableObject
 {
+    [ObservableProperty] private bool _enable;
     public int Id { get; set; }
     public string? Source { get; set; }
     public string? Name { get; set; }
-    [ObservableProperty] private bool _enable;
     public bool IsCustom { get; set; }
 }
 
