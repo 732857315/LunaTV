@@ -260,14 +260,6 @@ public partial class TVShowHomeViewModel : ViewModelBase
         _loadingWaitViewModel.Close();
     }
 
-    [RelayCommand]
-    private void NaviHistory()
-    {
-        var mvm = App.Services.GetRequiredService<MainViewModel>();
-        // if (mvm.Pages[0] is TVShowViewModel tvvm)
-        //     tvvm.SelectedItem = tvvm.Items[2];
-    }
-
     public async Task Loading()
     {
         var options = new DialogOptions
