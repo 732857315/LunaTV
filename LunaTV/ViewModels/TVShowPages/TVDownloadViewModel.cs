@@ -183,8 +183,14 @@ public partial class TVDownloadViewModel : ViewModelBase
     [RelayCommand]
     private async Task DownloadAction()
     {
+        if (string.IsNullOrEmpty(DownloadName) || string.IsNullOrEmpty(DownloadUrl))
+        {
+            App.Notification?.Show(new Notification("错误", "请输入下载名称和地址", NotificationType.Error));
+            return;
+        }
+
         // 外部资源下载
-        await AddMediaDownload(OtherUtil.GetFileNameFromInput(DownloadUrl), DownloadUrl);
+        await AddMediaDownload(DownloadName, DownloadUrl);
     }
 }
 
