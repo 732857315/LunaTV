@@ -3,6 +3,7 @@ using Avalonia.Dialogs;
 using LunaTV.Extensions;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Text;
 
 namespace LunaTV;
 
@@ -14,6 +15,12 @@ internal sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // windows下输出中文
+        if (OperatingSystem.IsWindows())
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+        }
+
         BuildAvaloniaApp()
             .StartWithClassicDesktopLifetime(args);
     }

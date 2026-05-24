@@ -4,11 +4,14 @@
     x:Class="LunaTV.Views.TVShowPages.TVDownloadView"
     x:DataType="vm:TVDownloadViewModel"
     xmlns="https://github.com/avaloniaui"
+    xmlns:converters="clr-namespace:LunaTV.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:u="https://irihi.tech/ursa"
     xmlns:vm="using:LunaTV.ViewModels.TVShowPages"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
+    <UserControl.Resources>
+        <converters:StatusToBackgroundConverter x:Key="StatusToBackgroundConverter" />
+    </UserControl.Resources>
     <UserControl.Styles>
         <Style Selector="Button.TransparentButton:pointerover">
             <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter">
@@ -88,17 +91,17 @@
                 Text="下载管理"
                 Theme="{DynamicResource TitleTextBlock}" />
 
-
             <TextBlock
                 DockPanel.Dock="Right"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center">
-                <Run Text="下载中:" />
+                <Run Text="下载中:  " />
                 <Run Foreground="{DynamicResource SemiLime3}" Text="{Binding DownloadingCount}" />
-                <Run Text="  等待中：" />
+                <Run Text="  条  |  等待中：" />
                 <Run Foreground="{DynamicResource SemiAmber6}" Text="{Binding WaitingCount}" />
-                <Run Text="  总共：" />
+                <Run Text="  条  |  总共：" />
                 <Run Foreground="{DynamicResource SemiGrey7}" Text="{Binding TotalCount}" />
+                <Run Text="  条" />
             </TextBlock>
         </DockPanel>
 
@@ -111,27 +114,79 @@
             IsReadOnly="True"
             ItemsSource="{Binding MediaDownloadViewModels}"
             Margin="8">
+            <DataGrid.Styles>
+                <Style Selector="Label.statusClasses">
+                    <Setter Property="Background" Value="{DynamicResource LabelTagSolidGreyBackground}" />
+                    <Setter Property="Foreground" Value="{DynamicResource LabelTagSolidForeground}" />
+                </Style>
+                <Style Selector="Label[Tag='下载中']">
+                    <Setter Property="Background" Value="{DynamicResource LabelTagSolidLimeBackground}" />
+                    <Setter Property="Foreground" Value="{DynamicResource LabelTagSolidForeground}" />
+                </Style>
+                <Style Selector="Label[Tag='已完成']">
+                    <Setter Property="Background" Value="{DynamicResource LabelTagSolidGreenBackground}" />
+                    <Setter Property="Foreground" Value="{DynamicResource LabelTagSolidForeground}" />
+                </Style>
+                <Style Selector="Label[Tag='下载失败']">
+                    <Setter Property="Background" Value="{DynamicResource LabelTagSolidRedBackground}" />
+                    <Setter Property="Foreground" Value="{DynamicResource LabelTagSolidForeground}" />
+                </Style>
+            </DataGrid.Styles>
             <DataGrid.Columns>
                 <DataGridTextColumn
                     Binding="{Binding Name}"
                     Header="影视名称"
-                    Width="2*" />
-                <DataGridTemplateColumn Header="操作" Width="3*">
+                    Width="*" />
+
+                <!--  92.54% 55.66MB/60.15MB 1.90MBps 00:00:02  -->
+
+                <DataGridTemplateColumn Header="进度条" Width="2*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel
+                                Margin="8,4"
+                                Orientation="Horizontal"
+                                Spacing="4">
+                                <ProgressBar
+                                    Maximum="100"
+                                    MinWidth="120"
+                                    Minimum="0"
+                                    ShowProgressText="True"
+                                    Value="{Binding Progress}" />
+                                <TextBlock
+                                    HorizontalAlignment="Right"
+                                    Text="{Binding SizeStr}"
+                                    VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn
+                    Binding="{Binding Speed}"
+                    Header="下载速度"
+                    Width="*" />
+                <DataGridTextColumn
+                    Binding="{Binding RemainingTime}"
+                    Header="剩余时间"
+                    Width="*" />
+                <DataGridTemplateColumn Header="状态" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Label
+                                Background="{Binding Status, Converter={StaticResource StatusToBackgroundConverter}}"
+                                Content="{Binding Status}"
+                                Foreground="{DynamicResource LabelTagSolidForeground}"
+                                Theme="{DynamicResource TagLabel}" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="操作" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <StackPanel
                                 Margin="4,4"
                                 Orientation="Horizontal"
                                 Spacing="4">
-                                <Button
-                                    Classes="TransparentButton"
-                                    Command="{Binding DownloadActionCommand}"
-                                    Content="{Binding ActionText}"
-                                    Theme="{DynamicResource OutlineButton}" />
-                                <Button
-                                    Classes="TransparentButton"
-                                    Content="删除"
-                                    Theme="{DynamicResource OutlineButton}" />
                                 <Button
                                     Classes="TransparentButton"
                                     Theme="{DynamicResource BorderlessButton}"
@@ -149,47 +204,10 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="状态" Width="4*">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <StackPanel
-                                Margin="8,4"
-                                Orientation="Horizontal"
-                                Spacing="4">
-                                <Label
-                                    Classes="Solid"
-                                    Classes.Lime="{Binding ActionIndicate}"
-                                    Classes.Red="{Binding !ActionIndicate}"
-                                    Content="{Binding Status}"
-                                    Theme="{StaticResource TagLabel}" />
-                                <ProgressBar
-                                    IsIndeterminate="{Binding StatusIndicate}"
-                                    Maximum="100"
-                                    MinWidth="120"
-                                    Minimum="0"
-                                    ShowProgressText="True"
-                                    Value="{Binding Progress}" />
-
-                                <!--  92.54% 55.66MB/60.15MB 1.90MBps 00:00:02  -->
-
-                                <TextBlock
-                                    DockPanel.Dock="Right"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center">
-                                    <Run Text="{Binding Speed}" />
-                                    <Run Text="  " />
-                                    <Run Text="{Binding SizeStr}" />
-                                    <Run Text="  " />
-                                    <Run Text="{Binding RemainingTime}" />
-                                </TextBlock>
-                            </StackPanel>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
                 <DataGridTextColumn
                     Binding="{Binding UpdateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
                     Header="下载时间"
-                    Width="2*" />
+                    Width="*" />
             </DataGrid.Columns>
 
         </DataGrid>

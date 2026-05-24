@@ -28,6 +28,13 @@ internal class LunaDownloadManager
     private int _taskId;
     private List<OutputFile> OutputFiles = [];
 
+    /// <summary>
+    /// 下载管理器
+    /// </summary>
+    /// <param name="downloaderConfig">下载器配置</param>
+    /// <param name="selectedSteams">选中的流，包含视频、音频、字幕等，每个流都有一个StreamSpec对象，默认就一个m3u8视频流</param>
+    /// <param name="streamExtractor">流提取器，用于从视频文件中提取流</param>
+    /// <param name="downloadStatus">下载状态，用于存储下载进度、速度等信息</param>
     public LunaDownloadManager(DownloaderConfig downloaderConfig, List<StreamSpec> selectedSteams,
         StreamExtractor streamExtractor, Dictionary<int, DownloadStatus> downloadStatus)
     {
@@ -797,6 +804,16 @@ internal class LunaDownloadManager
         var ds = _downloadStatus[task.Id];
         // 下载百分比
         ds.percentage = task.Percentage;
+        if (task.IsFinished)
+        {
+            ds.downloadType = task.Percentage >= 100 ? DownloadType.Downloaded : DownloadType.DownloadFailed;
+        }
+        else
+        {
+            ds.downloadType = DownloadType.Downloading;
+        }
+
+        if (task.Value <= 0) return;
 
         var speedContainer = speedContainerDic[task.Id];
         ds.size = speedContainer.RDownloaded;
