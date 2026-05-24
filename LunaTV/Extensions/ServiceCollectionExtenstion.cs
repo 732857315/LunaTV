@@ -8,7 +8,9 @@ using LunaTV.Base.DB;
 using LunaTV.Constants;
 using LunaTV.Services;
 using LunaTV.ViewModels;
+using LunaTV.ViewModels.TVShowPages;
 using LunaTV.Views;
+using LunaTV.Views.TVShowPages;
 using Microsoft.Extensions.DependencyInjection;
 using Refit;
 
@@ -111,6 +113,7 @@ public static class ServiceCollectionExtenstion
         // page view model
         serviceCollection.AddTransient<SettingsViewModel>();
         serviceCollection.AddSingleton<MainViewModel>();
+        serviceCollection.AddSingleton<TVDownloadViewModel>();
     }
 
     /// <summary>
@@ -122,6 +125,11 @@ public static class ServiceCollectionExtenstion
         // 主窗口
         serviceCollection.AddSingleton<MainWindow>();
         serviceCollection.AddSingleton<MainView>();
+        serviceCollection.AddSingleton<TVDownloadView>(provider =>
+            new TVDownloadView
+            {
+                DataContext = provider.GetRequiredService<TVDownloadViewModel>()
+            });
         serviceCollection.AddTransient<SettingsView>(provider =>
             new SettingsView
             {

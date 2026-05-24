@@ -124,10 +124,7 @@ public partial class MainViewModel : ViewModelBase
                 {
                     DataContext = new TVShowHistoryViewModel()
                 },
-                "下载" => new TVDownloadView
-                {
-                    DataContext = new TVDownloadViewModel()
-                },
+                "下载" => App.Services.GetRequiredService<TVDownloadView>(),
                 "配置" => new TVShowSettingView
                 {
                     DataContext = new TVShowSettingViewModel()

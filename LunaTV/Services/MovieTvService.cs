@@ -34,7 +34,7 @@ public class MovieTvService
             var site = isAdult ? AppConifg.AdultApiSitesConfig[source] : AppConifg.ApiSitesConfig[source];
             var apiService = _apiFactory.CreateRefitClient<IMovieTvApi>(new Uri(site.ApiBaseUrl));
             var results = await apiService.SearchVideos(name);
-            var json = JsonSerializer.Deserialize<MovieSoubject>(results,
+            var json = JsonSerializer.Deserialize<MovieSubject>(results,
                 new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true // 处理大小写不敏感
@@ -65,7 +65,7 @@ public class MovieTvService
             for (var i = 2; i <= pagesToFetch + 1; i++)
             {
                 var pageResults = await apiService.PageSearchVideos(name, i);
-                var pageJson = JsonSerializer.Deserialize<MovieSoubject>(pageResults,
+                var pageJson = JsonSerializer.Deserialize<MovieSubject>(pageResults,
                     new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true // 处理大小写不敏感
@@ -107,7 +107,7 @@ public class MovieTvService
                 var apiService = _apiFactory.CreateRefitClient<IMovieTvApi>(new Uri(site.ApiBaseUrl));
                 var results = await apiService.GetVideoDetail(vodId);
 
-                var json = JsonSerializer.Deserialize<MovieSoubject>(results,
+                var json = JsonSerializer.Deserialize<MovieSubject>(results,
                     new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true // 处理大小写不敏感

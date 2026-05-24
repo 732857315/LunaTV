@@ -14,7 +14,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Avalonia.Threading;
+using LunaTV.Views.TVShowPages;
+using Ursa.Controls;
 using Notification = Ursa.Controls.Notification;
 
 namespace LunaTV.ViewModels.TVShowPages;
@@ -117,16 +122,37 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
     [RelayCommand]
     private async Task CopyLinks()
     {
-        await App.Clipboard.SetTextAsync($"{VideoName}\n" +
-                                         string.Join("\n", Episodes.Select(ep => $"{ep.Name}:{ep.Url}")));
-        App.Notification?.Show(new Notification("复制链接", $"成功复制{Episodes.Count}个链接到剪切板", NotificationType.Success),
+        var CopyMediaSubject = new CopyMediaSubject
+        {
+            Name = VideoName,
+            Medias = Episodes.Select(ep => new CopyMediaDetail
+            {
+                Url = ep.Url,
+                Episode = ep.Name
+            }).ToList()
+        };
+        await App.Clipboard.SetTextAsync(JsonSerializer.Serialize(CopyMediaSubject,
+            new JsonSerializerOptions
+            {
+                WriteIndented = true, // 美化输出（缩进）
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping // 支持中文字符
+            }));
+        App.Notification?.Show(new Notification("复制链接", $"成功复制{Episodes.Count}个链接到剪切板",
+                NotificationType.Success),
             NotificationType.Success);
-    }
 
-    [RelayCommand]
-    private void ReverseVideos()
-    {
-        App.Notification?.Show(new Notification("倒序排列", "未实现呢！", NotificationType.Warning), NotificationType.Warning);
+        var downloadSelectionViewModel = new TVDownloadSelectionViewModel(VideoName, CopyMediaSubject.Medias);
+        if (await Dialog.ShowCustomAsync<TVDownloadSelectionView, TVDownloadSelectionViewModel, bool>(
+                downloadSelectionViewModel))
+        {
+            var selectedEpisodes = downloadSelectionViewModel.Episodes.Where(ep => ep.IsSelected);
+            var tvdownloadVm = App.Services.GetRequiredService<TVDownloadViewModel>();
+
+            foreach (var episode in selectedEpisodes)
+            {
+                await tvdownloadVm.AddMediaDownload($"{VideoName}-{episode.Episode}", episode.Url);
+            }
+        }
     }
 }
 

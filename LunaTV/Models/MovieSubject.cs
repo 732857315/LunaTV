@@ -4,7 +4,7 @@ using LunaTV.Converters;
 
 namespace LunaTV.Models;
 
-public class MovieSoubject
+public class MovieSubject
 {
     [JsonPropertyName("code")] public int Code { get; set; }
     [JsonPropertyName("msg")] public string? Msg { get; set; }
@@ -20,10 +20,10 @@ public class MovieSoubject
     [JsonPropertyName("page")]
     public int Page { get; set; }
 
-    [JsonPropertyName("list")] public List<MovieSubSoubject>? List { get; set; }
+    [JsonPropertyName("list")] public List<MovieSubSubject>? List { get; set; }
 }
 
-public class MovieSubSoubject
+public class MovieSubSubject
 {
     [JsonConverter(typeof(FlexibleStringConverter))]
     [JsonPropertyName("vod_id")]
