@@ -56,7 +56,9 @@ public static class ServiceCollectionExtenstion
             {
                 if (!response.IsSuccessStatusCode)
                     // var error = await response.Content.ReadAsStringAsync();
+                {
                     Console.WriteLine($"API 错误: {response.StatusCode}");
+                }
 
                 return null;
             }
@@ -112,6 +114,7 @@ public static class ServiceCollectionExtenstion
     {
         // page view model
         serviceCollection.AddTransient<SettingsViewModel>();
+        serviceCollection.AddTransient<TVShowHistoryViewModel>();
         serviceCollection.AddSingleton<MainViewModel>();
         serviceCollection.AddSingleton<TVDownloadViewModel>();
     }
@@ -134,6 +137,11 @@ public static class ServiceCollectionExtenstion
             new SettingsView
             {
                 DataContext = provider.GetRequiredService<SettingsViewModel>()
+            });
+        serviceCollection.AddTransient<TVShowHistoryView>(provider =>
+            new TVShowHistoryView
+            {
+                DataContext = provider.GetRequiredService<TVShowHistoryViewModel>()
             });
     }
 

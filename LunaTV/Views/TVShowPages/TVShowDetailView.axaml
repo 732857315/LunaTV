@@ -88,7 +88,41 @@
             Grid.Row="2"
             HorizontalSpacing="8"
             Margin="4">
-            <TextBlock Text="{Binding EpisodesCountText}" VerticalAlignment="Center" />
+            <TextBlock
+                DockPanel.Dock="Left"
+                Text="{Binding EpisodesCountText}"
+                VerticalAlignment="Center" />
+            <u:IconButton
+                Command="{Binding ToggleSelectAllCommand}"
+                Content="全选/取消全选"
+                DockPanel.Dock="Left"
+                HorizontalAlignment="Left"
+                Icon="{StaticResource SemiIconTvCheckedStroked}"
+                IsVisible="{Binding IsDownloadingSelected}" />
+            <u:IconButton
+                Classes="Success"
+                Command="{Binding DownloadSelectedCommand}"
+                Content="开始下载"
+                DockPanel.Dock="Left"
+                HorizontalAlignment="Left"
+                Icon="{StaticResource SemiIconFilledArrowDown}"
+                IsVisible="{Binding IsDownloadingSelected}" />
+            <TextBlock
+                DockPanel.Dock="Left"
+                IsVisible="{Binding IsDownloadingSelected}"
+                VerticalAlignment="Center">
+                <Run Text="已选中：" />
+                <Run Text="{Binding SelectedEpisodeCount}" />
+                <Run Text="集" />
+            </TextBlock>
+
+
+            <u:IconToggleButton
+                Content="下载本地"
+                DockPanel.Dock="Right"
+                HorizontalAlignment="Right"
+                Icon="{StaticResource SemiIconDownload}"
+                IsChecked="{Binding IsDownloadingSelected}" />
             <u:IconButton
                 Command="{Binding CopyLinksCommand}"
                 Content="复制链接"
@@ -101,26 +135,34 @@
             <ItemsControl HorizontalAlignment="Left" ItemsSource="{Binding Episodes}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="tvvm:EpisodeSubjectItem">
-                        <Button
-                            Classes="EpisodeCard"
-                            Command="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).PlayCommand}"
-                            CommandParameter="{Binding}"
-                            Margin="0,4"
-                            Padding="0"
-                            Width="120">
-                            <Button.Styles>
-                                <Style Selector="Button.EpisodeCard:pointerover">
-                                    <Setter Property="RenderTransform" Value="scale(1.05,1.05)" />
-                                </Style>
-                            </Button.Styles>
-                            <TextBlock Classes.Warning="{Binding Watched}" Text="{Binding Name}">
-                                <TextBlock.Styles>
-                                    <Style Selector="TextBlock.Warning">
-                                        <Setter Property="ToolTip.Tip" Value="已经看过" />
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <CheckBox
+                                Command="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).SelectChangedCommand}"
+                                IsChecked="{Binding IsSelected}"
+                                IsVisible="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).IsDownloadingSelected}"
+                                Theme="{StaticResource SimpleCheckBox}"
+                                VerticalAlignment="Center" />
+                            <Button
+                                Classes="EpisodeCard"
+                                Command="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).PlayCommand}"
+                                CommandParameter="{Binding}"
+                                Margin="0,4"
+                                Padding="0"
+                                Width="120">
+                                <Button.Styles>
+                                    <Style Selector="Button.EpisodeCard:pointerover">
+                                        <Setter Property="RenderTransform" Value="scale(1.05,1.05)" />
                                     </Style>
-                                </TextBlock.Styles>
-                            </TextBlock>
-                        </Button>
+                                </Button.Styles>
+                                <TextBlock Classes.Warning="{Binding Watched}" Text="{Binding Name}">
+                                    <TextBlock.Styles>
+                                        <Style Selector="TextBlock.Warning">
+                                            <Setter Property="ToolTip.Tip" Value="已经看过" />
+                                        </Style>
+                                    </TextBlock.Styles>
+                                </TextBlock>
+                            </Button>
+                        </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 <ItemsControl.ItemsPanel>

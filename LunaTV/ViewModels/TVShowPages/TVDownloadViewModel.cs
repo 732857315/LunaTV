@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -30,13 +29,12 @@ public partial class TVDownloadViewModel : ViewModelBase
     private MediaDownloadViewModel? _currentDownloadingMVM;
 
     [ObservableProperty] private int _downloadingCount;
-    [ObservableProperty] private string _downloadUrl = "https://vod.360zyx.vip/20250708/7T2xjBRd/index.m3u8";
     [ObservableProperty] private string _downloadName = "曼达洛人";
-    public ObservableCollection<MediaDownloadViewModel> MediaDownloadViewModels { get; set; }
+    [ObservableProperty] private string _downloadUrl = "https://vod.360zyx.vip/20250708/7T2xjBRd/index.m3u8";
+    private bool _isInitialized;
 
     [ObservableProperty] private int _totalCount;
     [ObservableProperty] private int _waitingCount;
-    private bool _isInitialized;
 
     public TVDownloadViewModel()
     {
@@ -48,13 +46,15 @@ public partial class TVDownloadViewModel : ViewModelBase
         Dispatcher.UIThread.InvokeAsync(async () => { await LoadUnDownloadFromDBAsync(); });
     }
 
+    public ObservableCollection<MediaDownloadViewModel> MediaDownloadViewModels { get; set; }
+
     // 从数据库加载下载任务
     private async Task LoadUnDownloadFromDBAsync()
     {
         var unDownloads = await _mediaDownloadTable.GetListAsync(x => !x.IsDownloaded);
         foreach (var downloadTask in unDownloads)
         {
-            if (MediaDownloadViewModels.Any(x => x.Url == downloadTask.Url) != true)
+            if (!MediaDownloadViewModels.Any(x => x.Url == downloadTask.Url))
             {
                 MediaDownloadViewModels.Add(new MediaDownloadViewModel
                 {
@@ -150,7 +150,7 @@ public partial class TVDownloadViewModel : ViewModelBase
         _downloadTimer.Stop();
     }
 
-    public async Task AddMediaDownload(string name, string url)
+    public async Task AddMediaDownload(string name, string url, string folder = "")
     {
         if (MediaDownloadViewModels.Any(x => x.Url == url))
         {
@@ -172,8 +172,8 @@ public partial class TVDownloadViewModel : ViewModelBase
         if (mediaDownload != null)
         {
             var result =
-                await OverlayMessageBox.ShowAsync($"是否重新下载 【{name}】 ?", "提示", icon: MessageBoxIcon.Warning);
-            if (result != MessageBoxResult.OK)
+                await MessageBox.ShowAsync($"是否重新下载 【{name}】 ?", "提示", MessageBoxIcon.Warning, MessageBoxButton.YesNo);
+            if (result != MessageBoxResult.Yes)
             {
                 return;
             }
@@ -190,7 +190,7 @@ public partial class TVDownloadViewModel : ViewModelBase
             Episode = string.Empty,
             Url = url,
             IsDownloaded = false,
-            LocalPath = Path.Combine(GlobalDefine.DownloadPath, name)
+            LocalPath = Path.Combine(GlobalDefine.DownloadPath, folder)
         };
         if (id > 0)
         {
@@ -210,7 +210,7 @@ public partial class TVDownloadViewModel : ViewModelBase
             Episode = string.Empty,
             Url = url,
             DownloadStatus = DownloadType.None,
-            LocalPath = Path.Combine(GlobalDefine.DownloadPath, name),
+            LocalPath = Path.Combine(GlobalDefine.DownloadPath, folder),
             Status = StatusWord.Unstarted,
             Progress = 0,
             UpdateTime = DateTime.Now
@@ -276,10 +276,10 @@ public partial class MediaDownloadViewModel : ObservableObject
 {
     [ObservableProperty] private string? _localPath; // 本地地址
     [ObservableProperty] private int _progress;
-    [ObservableProperty] private string? _status = StatusWord.Unstarted; // 状态 未开始/下载中/下载失败/已完成
     [ObservableProperty] private string _remainingTime = "--:--:--";
     [ObservableProperty] private string _sizeStr = "--:--/--:--";
     [ObservableProperty] private string _speed = "0:00MBps";
+    [ObservableProperty] private string? _status = StatusWord.Unstarted; // 状态 未开始/下载中/下载失败/已完成
     public DownloadType DownloadStatus { get; set; } = DownloadType.None; // 下载状态 
 
     public int Id { get; set; }
@@ -296,9 +296,13 @@ public partial class MediaDownloadViewModel : ObservableObject
         try
         {
             if (OperatingSystem.IsWindows())
+            {
                 Process.Start("explorer.exe", LocalPath);
+            }
             else
+            {
                 Process.Start("open", LocalPath);
+            }
         }
         catch (Exception ex)
         {

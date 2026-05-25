@@ -32,14 +32,8 @@ public partial class MainViewModel : ViewModelBase
         // {
         //     DataContext = new TVShowFilterViewModel()
         // },
-        ["历史"] = new TVShowHistoryView
-        {
-            DataContext = new TVShowHistoryViewModel()
-        },
-        ["下载"] = new TVDownloadView
-        {
-            DataContext = new TVDownloadViewModel()
-        },
+        ["历史"] = App.Services.GetRequiredService<TVShowHistoryView>(),
+        ["下载"] = App.Services.GetRequiredService<TVDownloadView>(),
         ["配置"] = new TVShowSettingView
         {
             DataContext = new TVShowSettingViewModel()
@@ -116,14 +110,14 @@ public partial class MainViewModel : ViewModelBase
     {
         if (string.IsNullOrEmpty(content)) return;
         if (_viewDictionary.TryGetValue(content, out var control))
+        {
             PageContent = control;
+        }
         else
+        {
             PageContent = content switch
             {
-                "历史" => new TVShowHistoryView
-                {
-                    DataContext = new TVShowHistoryViewModel()
-                },
+                "历史" => App.Services.GetRequiredService<TVShowHistoryView>(),
                 "下载" => App.Services.GetRequiredService<TVDownloadView>(),
                 "配置" => new TVShowSettingView
                 {
@@ -131,6 +125,7 @@ public partial class MainViewModel : ViewModelBase
                 },
                 _ => null
             };
+        }
     }
 
     public UserControl GetControl(string name)

@@ -1,4 +1,12 @@
-﻿using Avalonia.Controls.Notifications;
+﻿using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Avalonia.Controls.Notifications;
 using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,16 +18,6 @@ using LunaTV.Models;
 using LunaTV.ViewModels.Base;
 using LunaTV.Views;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Threading.Tasks;
-using Avalonia.Threading;
-using LunaTV.Views.TVShowPages;
-using Ursa.Controls;
 using Notification = Ursa.Controls.Notification;
 
 namespace LunaTV.ViewModels.TVShowPages;
@@ -27,6 +25,9 @@ namespace LunaTV.ViewModels.TVShowPages;
 public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
 {
     private readonly SugarRepository<ViewHistory> _viewHistoryTable;
+    [ObservableProperty] private bool _isDownloadingSelected;
+    [ObservableProperty] private int _selectedEpisodeCount;
+
 
     public TVShowDetailViewModel()
     {
@@ -54,15 +55,18 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         {
             Watched = false,
             Name = ep.Name,
-            Url = ep.Url
+            Url = ep.Url,
+            IsSelected = true // 默认全部选中
         }).ToList();
         EpisodesCountText = $"共{Episodes.Count}集";
-        ViewHistory? viewHistory = _viewHistoryTable.GetSingle(his =>
+        var viewHistory = _viewHistoryTable.GetSingle(his =>
             his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
         if (viewHistory is not null)
         {
             Episodes[Episodes.IndexOf(Episodes.FirstOrDefault(ep => ep.Name == viewHistory.Episode))].Watched = true;
         }
+
+        SelectChanged();
     }
 
     [RelayCommand]
@@ -81,7 +85,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
             videoModel.Title = $"{VideoName} {episodeSubject.Name}";
             videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>(Episodes);
 
-            ViewHistory? viewHistory = _viewHistoryTable.GetSingle(his =>
+            var viewHistory = _viewHistoryTable.GetSingle(his =>
                 his.VodId == VideoDetail.VodId && his.Source == VideoDetail.Source && his.Name == VideoName);
             if (viewHistory is not null)
             {
@@ -140,24 +144,62 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         App.Notification?.Show(new Notification("复制链接", $"成功复制{Episodes.Count}个链接到剪切板",
                 NotificationType.Success),
             NotificationType.Success);
+    }
 
-        var downloadSelectionViewModel = new TVDownloadSelectionViewModel(VideoName, CopyMediaSubject.Medias);
-        if (await Dialog.ShowCustomAsync<TVDownloadSelectionView, TVDownloadSelectionViewModel, bool>(
-                downloadSelectionViewModel))
+    /// <summary>
+    ///     下载选中的剧集
+    /// </summary>
+    [RelayCommand]
+    private async Task DownloadSelected()
+    {
+        if (!File.Exists(GlobalDefine.FFmpegPath))
         {
-            var selectedEpisodes = downloadSelectionViewModel.Episodes.Where(ep => ep.IsSelected);
-            var tvdownloadVm = App.Services.GetRequiredService<TVDownloadViewModel>();
+            App.Notification?.Show(new Notification("错误", "FFmpeg路径配置错误", NotificationType.Error),
+                NotificationType.Error);
+            return;
+        }
 
-            foreach (var episode in selectedEpisodes)
+        var selectedEpisodes = Episodes.Where(ep => ep.IsSelected);
+
+        var tvdownloadVm = App.Services.GetRequiredService<TVDownloadViewModel>();
+
+        foreach (var episode in selectedEpisodes)
+        {
+            if (Episodes.Count > 1)
             {
-                await tvdownloadVm.AddMediaDownload($"{VideoName}-{episode.Episode}", episode.Url);
+                await tvdownloadVm.AddMediaDownload(episode.Name, episode.Url, VideoName);
+            }
+            else
+            {
+                await tvdownloadVm.AddMediaDownload($"{VideoName}-{episode.Name}", episode.Url);
             }
         }
+
+        IsDownloadingSelected = false;
+    }
+
+    [RelayCommand]
+    private void ToggleSelectAll()
+    {
+        var allSelected = Episodes.Any(e => e.IsSelected);
+        foreach (var episode in Episodes) episode.IsSelected = !allSelected;
+
+        SelectChanged();
+    }
+
+    /// <summary>
+    ///     选择剧集
+    /// </summary>
+    [RelayCommand]
+    private void SelectChanged()
+    {
+        SelectedEpisodeCount = Episodes.Count(e => e.IsSelected);
     }
 }
 
 public partial class EpisodeSubjectItem : ObservableObject
 {
+    [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private string? _name;
     [ObservableProperty] private string? _url;
     [ObservableProperty] private bool _watched; //是否观看
