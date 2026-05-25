@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,6 +34,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
     [ObservableProperty] private bool _isAdultVisible = true;
     [ObservableProperty] private string? _searchCountText = "0个结果";
     [ObservableProperty] private int _totalVideos;
+    [ObservableProperty] private int _pageSize = 16;
 
     public TVShowSearchViewModel()
     {
@@ -43,7 +45,6 @@ public partial class TVShowSearchViewModel : ViewModelBase
 
     public ObservableCollection<string> HistoryMovies { get; set; }
     public ObservableCollection<SearchResult> SearchResults { get; set; }
-    public int PageSize { get; } = 12;
 
     public async Task Search(string name)
     {
@@ -66,6 +67,8 @@ public partial class TVShowSearchViewModel : ViewModelBase
         SearchResults.Clear();
         _allSearchResults.Clear();
         CurrentPage = 1;
+        TotalVideos = 0;
+        SearchCountText = "0个结果";
 
         if (IsAdultMode)
             foreach (var api in AppConifg.SelectAdultApis)
@@ -146,9 +149,45 @@ public partial class TVShowSearchViewModel : ViewModelBase
     private void LoadPage(int page)
     {
         CurrentPage = page;
+        RefreshCurrentPage();
+    }
+
+    public void UpdatePageSize(double width, double height)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        const double itemMinWidth = 300;
+        const double itemHeight = 168;
+        const double itemSpacing = 8;
+
+        var columns = int.Max(1, (int)(width / (itemMinWidth + itemSpacing)));
+        var rows = int.Max(1, (int)(height / itemHeight));
+        var newPageSize = columns * rows;
+
+        if (newPageSize == PageSize) return;
+
+        PageSize = newPageSize;
+
+        if (_allSearchResults.Count == 0) return;
+
+        var maxPage = int.Max(1, (int)Math.Ceiling((double)_allSearchResults.Count / PageSize));
+        if (CurrentPage > maxPage) CurrentPage = maxPage;
+
+        RefreshCurrentPage();
+    }
+
+    private void RefreshCurrentPage()
+    {
         SearchResults.Clear();
-        _allSearchResults.GetRange((page - 1) * PageSize,
-            int.Min(PageSize, TotalVideos - (page - 1) * PageSize)).ForEach(x => SearchResults.Add(x));
+
+        var start = (CurrentPage - 1) * PageSize;
+        if (start >= _allSearchResults.Count) return;
+
+        _allSearchResults
+            .Skip(start)
+            .Take(PageSize)
+            .ToList()
+            .ForEach(x => SearchResults.Add(x));
     }
 
     public async Task Loading()

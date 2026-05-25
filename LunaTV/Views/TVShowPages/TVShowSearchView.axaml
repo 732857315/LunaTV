@@ -106,7 +106,7 @@
             Grid.Row="3"
             HorizontalAlignment="Right"
             Text="{Binding SearchCountText}" />
-        <ScrollViewer Grid.Row="4">
+        <ScrollViewer Grid.Row="4" Name="SearchResultScrollViewer">
             <ItemsControl HorizontalAlignment="Left" ItemsSource="{Binding SearchResults}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="models:SearchResult">
