@@ -95,7 +95,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             var text = _status switch
             {
                 PlaybackStatus.Loading => "Loading...",
-                PlaybackStatus.Playing => $"{ViewHistory.Name}-{ViewHistory.Episode}",
+                PlaybackStatus.Playing => ViewHistory != null ? $"{ViewHistory.Name}-{ViewHistory.Episode}" : Title,
                 PlaybackStatus.Error => "Error loading media",
                 _ => ""
             };
