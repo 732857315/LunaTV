@@ -14,19 +14,27 @@ using N_m3u8DL_RE.Parser;
 using N_m3u8DL_RE.Parser.Mp4;
 using N_m3u8DL_RE.Util;
 using Spectre.Console;
+using Timer = System.Timers.Timer;
 
 namespace M3U8Download;
 
 internal class LunaDownloadManager
 {
+    private readonly Dictionary<int, DownloadStatus> _downloadStatus;
     private readonly IDownloader Downloader;
     private readonly DownloaderConfig DownloaderConfig;
     private readonly List<StreamSpec> SelectedSteams;
     private readonly StreamExtractor StreamExtractor;
     private int _taskId;
-    private Dictionary<int, DownloadStatus> _downloadStatus;
     private List<OutputFile> OutputFiles = [];
 
+    /// <summary>
+    /// 下载管理器
+    /// </summary>
+    /// <param name="downloaderConfig">下载器配置</param>
+    /// <param name="selectedSteams">选中的流，包含视频、音频、字幕等，每个流都有一个StreamSpec对象，默认就一个m3u8视频流</param>
+    /// <param name="streamExtractor">流提取器，用于从视频文件中提取流</param>
+    /// <param name="downloadStatus">下载状态，用于存储下载进度、速度等信息</param>
     public LunaDownloadManager(DownloaderConfig downloaderConfig, List<StreamSpec> selectedSteams,
         StreamExtractor streamExtractor, Dictionary<int, DownloadStatus> downloadStatus)
     {
@@ -349,7 +357,7 @@ internal class LunaDownloadManager
         foreach (var badKey in badKeys) FileDic!.Remove(badKey, out _);
 
         // 校验完整性
-        if (DownloaderConfig.CheckContentLength && FileDic.Values.Any(a => a!.Success == false)) return false;
+        if (DownloaderConfig.CheckContentLength && FileDic.Values.Any(a => !a!.Success)) return false;
 
         // 自动修复VTT raw字幕
         if (DownloaderConfig.MyOptions.AutoSubtitleFix &&
@@ -681,33 +689,36 @@ internal class LunaDownloadManager
             Logger.WarnMarkUp($"[darkorange3_1]{ResString.realTimeDecMessage}[/]");
 
         // 创建任务
-        var dic = SelectedSteams.Select((item, id) =>
+        var dic = SelectedSteams.Select(item =>
         {
             var description = item.ToShortShortString();
             _downloadStatus[_taskId] = new DownloadStatus
             {
-                description = description
+                name = DownloaderConfig.MyOptions.SaveName,
+                url = DownloaderConfig.MyOptions.BaseUrl,
+                saveDir = DownloaderConfig.MyOptions.SaveDir,
+                downloadType = DownloadType.None
             };
-            var task = new ProgressTask(_taskId++, description, 100, false);
-            SpeedContainerDic[id] = new SpeedContainer(); // 速度计算
+            var task = new ProgressTask(_taskId, description, 100, false);
+            SpeedContainerDic[_taskId] = new SpeedContainer(); // 速度计算
             // 限速设置
             if (DownloaderConfig.MyOptions.MaxSpeed != null)
-                SpeedContainerDic[id].SpeedLimit = DownloaderConfig.MyOptions.MaxSpeed.Value;
+                SpeedContainerDic[_taskId].SpeedLimit = DownloaderConfig.MyOptions.MaxSpeed.Value;
+            _taskId++;
             return (item, task);
         }).ToDictionary(item => item.item, item => item.task);
 
         if (!DownloaderConfig.MyOptions.ConcurrentDownload)
             // 遍历，顺序下载
-            foreach (var kp in dic)
+            foreach (var (item, task) in dic)
             {
-                var task = kp.Value;
-                var goTimer = new System.Timers.Timer(1000);
-                goTimer.Elapsed += (_, _) => { RunTask(task, SpeedContainerDic); };
+                var goTimer = new Timer(1000);
+                goTimer.Elapsed += (_, _) => { RunTask(item, task, SpeedContainerDic); };
                 goTimer.Start();
-                var result = await DownloadStreamAsync(kp.Key, task, SpeedContainerDic[task.Id]);
+                var result = await DownloadStreamAsync(item, task, SpeedContainerDic[task.Id]);
                 goTimer.Stop();
-                RunTask(task, SpeedContainerDic);
-                Results[kp.Key] = result;
+                RunTask(item, task, SpeedContainerDic);
+                Results[item] = result;
                 // 失败不再下载后续
                 if (!result) break;
             }
@@ -787,24 +798,34 @@ internal class LunaDownloadManager
         return success;
     }
 
-    private void RunTask(ProgressTask task, ConcurrentDictionary<int, SpeedContainer> speedContainerDic)
+    private void RunTask(StreamSpec spec, ProgressTask task,
+        ConcurrentDictionary<int, SpeedContainer> speedContainerDic)
     {
         var ds = _downloadStatus[task.Id];
+        // 下载百分比
         ds.percentage = task.Percentage;
+        if (task.IsFinished)
+        {
+            ds.downloadType = task.Percentage >= 100 ? DownloadType.Downloaded : DownloadType.DownloadFailed;
+        }
+        else
+        {
+            ds.downloadType = DownloadType.Downloading;
+        }
+
+        if (task.Value <= 0) return;
 
         var speedContainer = speedContainerDic[task.Id];
         ds.size = speedContainer.RDownloaded;
         ds.totalSize = speedContainer.SingleSegment
-            ? (speedContainer.ResponseLength ?? 0)
+            ? speedContainer.ResponseLength ?? 0
             : (long)(ds.size / (task.Value / task.MaxValue));
         ds.sizeStr = $"{GlobalUtil.FormatFileSize(ds.size)}/{GlobalUtil.FormatFileSize(ds.totalSize)}";
 
         speedContainer.NowSpeed = speedContainer.Downloaded;
         // 速度为0，计数增加
         if (speedContainer.Downloaded <= 0)
-        {
             speedContainer.AddLowSpeedCount();
-        }
         else speedContainer.ResetLowSpeedCount();
 
         speedContainer.Reset();
@@ -814,17 +835,11 @@ internal class LunaDownloadManager
         ds.remainingTime = task.RemainingTime;
 
         if (!ds.remainingTime.HasValue)
-        {
             ds.remainingTimeStr = "--:--:--";
-        }
         else if (ds.remainingTime.Value.TotalHours > 99.0)
-        {
             ds.remainingTimeStr = "**:**:**";
-        }
         else
-        {
             ds.remainingTimeStr = $"{ds.remainingTime.Value:hh\\:mm\\:ss}";
-        }
 
         Console.WriteLine($"download {ds.percentage:F2}% {ds.sizeStr} {ds.speed} {ds.remainingTimeStr}");
     }

@@ -1,45 +1,80 @@
 ﻿<UserControl
-    d:DesignHeight="450"
-    d:DesignWidth="800"
-    mc:Ignorable="d"
     x:Class="LunaTV.Views.MainView"
-    x:DataType="vm:MainViewModel"
     xmlns="https://github.com/avaloniaui"
-    xmlns:base="using:LunaTV.ViewModels.Base"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:ui="using:FluentAvalonia.UI.Controls"
-    xmlns:uip="using:FluentAvalonia.UI.Controls.Primitives"
+    xmlns:u="https://irihi.tech/ursa"
     xmlns:vm="using:LunaTV.ViewModels"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <UserControl.Styles>
-        <Style Selector="ui|NavigationViewItem uip|NavigationViewItemPresenter:selected /template/ ContentPresenter#Icon">
-            <Setter Property="Foreground" Value="{DynamicResource AccentFillColorDefaultBrush}" />
-        </Style>
-    </UserControl.Styles>
-    <Grid RowDefinitions="Auto,*">
-        <ui:NavigationView
-            AlwaysShowHeader="True"
-            FooterMenuItemsSource="{Binding FooterPages, Mode=OneWay}"
-            Grid.RowSpan="2"
-            IsPaneOpen="False"
-            IsSettingsVisible="False"
-            MenuItemsSource="{Binding Pages, Mode=OneWay}"
-            OpenPaneLength="{Binding PaneWidth}"
-            PaneDisplayMode="Left"
-            SelectedItem="{Binding SelectedCategory}"
-            x:Name="NaviView">
-            <ui:NavigationView.MenuItemTemplate>
-                <DataTemplate DataType="{x:Type base:PageViewModelBase}">
-                    <ui:NavigationViewItem
-                        Content="{Binding Title}"
-                        IconSource="{Binding IconSource}"
-                        Margin="0,0,0,0"
-                        Tag="{Binding}" />
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    x:DataType="vm:MainViewModel"
+    mc:Ignorable="d">
+    <Grid RowDefinitions="*,Auto">
+        <TransitioningContentControl Content="{Binding PageContent}">
+            <TransitioningContentControl.PageTransition>
+                <CompositePageTransition>
+                    <CrossFade Duration="0:0:0.5" />
+                    <PageSlide
+                        Orientation="Vertical"
+                        SlideInEasing="QuadraticEaseIn"
+                        SlideOutEasing="QuadraticEaseOut"
+                        Duration="0:0:0.3" />
+                </CompositePageTransition>
+            </TransitioningContentControl.PageTransition>
+        </TransitioningContentControl>
+        <u:SelectionList
+            Grid.Row="1"
+            ItemsSource="{Binding Items}"
+            SelectedItem="{Binding SelectedItem}">
+            <u:SelectionList.Indicator>
+                <Border Background="Transparent" CornerRadius="4">
+                    <Border
+                        Height="2"
+                        Margin="0,2"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Bottom"
+                        Background="{DynamicResource SemiBlue6}"
+                        CornerRadius="2" />
+                </Border>
+            </u:SelectionList.Indicator>
+            <u:SelectionList.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="40" />
+                </ItemsPanelTemplate>
+            </u:SelectionList.ItemsPanel>
+            <u:SelectionList.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:TVMenuItem}">
+                    <StackPanel
+                        Height="20"
+                        Margin="0,10"
+                        Orientation="Vertical">
+
+                        <PathIcon
+                            BorderBrush="{DynamicResource SemiBlue6}"
+                            Classes.Active="{Binding $parent[u:SelectionListItem].IsSelected, Mode=OneWay}"
+                            Data="{Binding Data}"
+                            FontSize="10" />
+                        <TextBlock
+                            Margin="0,0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Classes.Active="{Binding $parent[u:SelectionListItem].IsSelected, Mode=OneWay}"
+                            FontSize="10"
+                            Text="{Binding Name}">
+                            <TextBlock.Styles>
+                                <Style Selector="TextBlock.Active">
+                                    <Setter Property="Foreground" Value="{DynamicResource SemiBlue6}" />
+                                </Style>
+                            </TextBlock.Styles>
+                        </TextBlock>
+                    </StackPanel>
                 </DataTemplate>
-            </ui:NavigationView.MenuItemTemplate>
-            <ui:Frame DataContext="{x:Null}" x:Name="FrameView" />
-        </ui:NavigationView>
+            </u:SelectionList.ItemTemplate>
+        </u:SelectionList>
     </Grid>
 
 </UserControl>

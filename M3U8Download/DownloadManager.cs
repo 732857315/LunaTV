@@ -18,6 +18,8 @@ public class DownloadManager
 {
     public Dictionary<int, DownloadStatus> DownloadStatus { get; private set; } = new Dictionary<int, DownloadStatus>();
 
+    private static bool HttpConfigured { get; set; } = false;
+    
     public DownloadOption? Option { get; } = new()
     {
         AdKeywords = [],
@@ -106,16 +108,19 @@ public class DownloadManager
         Option.Input = url;
         Option.SaveDir = savePath;
         Option.SaveName = saveName;
-        HTTPUtil.AppHttpClient.Timeout = TimeSpan.FromSeconds(Option.HttpRequestTimeout);
+        
+        if (!HttpConfigured)
+            HTTPUtil.AppHttpClient.Timeout = TimeSpan.FromSeconds(Option.HttpRequestTimeout);
+        
 
         Logger.IsWriteFile = !Option.NoLog;
         Logger.LogFilePath = Option.LogFilePath;
         Logger.InitLogFile();
         Logger.LogLevel = Option.LogLevel;
 
-        if (Option.UseSystemProxy == false) HTTPUtil.HttpClientHandler.UseProxy = false;
+        if (Option.UseSystemProxy == false && !HttpConfigured) HTTPUtil.HttpClientHandler.UseProxy = false;
 
-        if (Option.CustomProxy != null)
+        if (Option.CustomProxy != null && !HttpConfigured)
         {
             HTTPUtil.HttpClientHandler.Proxy = Option.CustomProxy;
             HTTPUtil.HttpClientHandler.UseProxy = true;
@@ -369,6 +374,7 @@ public class DownloadManager
         }
         else if (!livingFlag)
         {
+            HttpConfigured = true;
             // 开始下载
             var sdm = new LunaDownloadManager(downloadConfig, selectedStreams, extractor, DownloadStatus);
             result = await sdm.StartDownloadAsync();

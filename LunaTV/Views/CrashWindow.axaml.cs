@@ -1,8 +1,5 @@
-﻿using System;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
-using Avalonia.Styling;
+﻿using Avalonia.Input.Platform;
+using System;
 using Ursa.Controls;
 
 namespace LunaTV.Views;
@@ -16,11 +13,17 @@ public partial class CrashWindow : UrsaWindow
         Info.Text = exception;
         Copy.Click += async (_, _) =>
         {
-            var clipboard = GetTopLevel(this)?.Clipboard;
+            IClipboard? clipboard = GetTopLevel(this)?.Clipboard;
             await clipboard!.SetTextAsync(exception);
         };
-        Continue.Click += (_, _) => { Close(); };
-        Exit.Click += (_, _) => { Environment.Exit(0); };
+        Continue.Click += (_, _) =>
+        {
+            Close();
+        };
+        Exit.Click += (_, _) =>
+        {
+            Environment.Exit(0);
+        };
         Topmost = true;
         Show();
         Activate();

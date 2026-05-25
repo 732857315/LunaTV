@@ -17,7 +17,7 @@ public abstract class MpvProperty<TNull, TRaw>
     public MpvProperty(MpvContext mpv, string name)
     {
         Mpv = mpv;
-        PropertyName = name.CheckNotNullOrEmpty(nameof(name));
+        PropertyName = Check.NotNullOrEmpty(name);
         var type = typeof(TNull);
         Format = MpvFormatter.GetMpvFormat<TRaw>();
     }

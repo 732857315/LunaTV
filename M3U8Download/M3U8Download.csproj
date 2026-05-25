@@ -8,10 +8,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="NiL.JS" Version="2.5.1684"/>
-    </ItemGroup>
-
-    <ItemGroup>
         <ProjectReference Include="..\N_m3u8DL-RE\src\N_m3u8DL-RE.Parser\N_m3u8DL-RE.Parser.csproj"/>
     </ItemGroup>
 

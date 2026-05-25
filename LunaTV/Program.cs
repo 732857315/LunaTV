@@ -1,27 +1,34 @@
 ﻿using Avalonia;
-using System;
-using AsyncImageLoader;
-using AsyncImageLoader.Loaders;
 using Avalonia.Dialogs;
-using Avalonia.Media;
 using LunaTV.Extensions;
 using Microsoft.Extensions.Hosting;
+using System;
+using System.Text;
 
 namespace LunaTV;
 
-sealed class Program
+internal sealed class Program
 {
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        // windows下输出中文
+        if (OperatingSystem.IsWindows())
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+        }
+
+        BuildAvaloniaApp()
+            .StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
     {
-        var host = Host.CreateDefaultBuilder()
+        IHost host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
                 services.AddViewModels();
@@ -36,17 +43,31 @@ sealed class Program
             .UseManagedSystemDialogs()
 #pragma warning restore CA1416
             .UsePlatformDetect()
-            .With(new Win32PlatformOptions())
-            .With(new FontManagerOptions
+            .With(new X11PlatformOptions
             {
-                FontFallbacks = new[]
-                {
-                    new FontFallback
-                    {
-                        FontFamily = new FontFamily("Microsoft YaHei")
-                    }
-                }
+                RenderingMode = new[] { X11RenderingMode.Glx, X11RenderingMode.Egl }
             })
+            .With(new AvaloniaNativePlatformOptions
+            {
+                RenderingMode =
+                [
+                    // put OpenGL first, to have higher priority over Metal
+                    AvaloniaNativeRenderingMode.OpenGl,
+                    AvaloniaNativeRenderingMode.Metal,
+                    AvaloniaNativeRenderingMode.Software
+                ]
+            })
+            .With(new Win32PlatformOptions())
+            // .With(new FontManagerOptions
+            // {
+            //     FontFallbacks = new[]
+            //     {
+            //         new FontFallback
+            //         {
+            //             FontFamily = new FontFamily("PingFang SC")
+            //         }
+            //     }
+            // })
             .LogToTrace();
     }
 }

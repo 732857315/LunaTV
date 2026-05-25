@@ -1,105 +1,133 @@
 ﻿<UserControl
+    MaxWidth="800"
+    d:DesignHeight="450"
+    d:DesignWidth="800"
+    mc:Ignorable="d"
     x:Class="LunaTV.Views.TVShowPages.TVShowDetailView"
+    x:DataType="tvvm:TVShowDetailViewModel"
     xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:tvvm="using:LunaTV.ViewModels.TVShowPages"
     xmlns:u="https://irihi.tech/ursa"
-    MaxWidth="800"
-    d:DesignHeight="450"
-    d:DesignWidth="800"
-    x:DataType="tvvm:TVShowDetailViewModel"
-    mc:Ignorable="d">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid
-        MinWidth="480"
         MinHeight="480"
+        MinWidth="480"
         RowDefinitions="Auto,Auto,Auto,*">
         <StackPanel
             Margin="8"
             Orientation="Horizontal"
             Spacing="8">
             <TextBlock
-                HorizontalAlignment="Left"
-                VerticalAlignment="Center"
                 FontSize="32"
                 FontWeight="ExtraBold"
+                HorizontalAlignment="Left"
                 IsHitTestVisible="False"
-                Text="{Binding VideoName}">
+                Text="{Binding VideoName}"
+                VerticalAlignment="Center">
                 <TextBlock.Foreground>
-                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                        <GradientStop Offset="0" Color="#FF6094EA" />
-                        <GradientStop Offset="1" Color="#FFF02FC2" />
+                    <LinearGradientBrush EndPoint="100%,100%" StartPoint="0%,0%">
+                        <GradientStop Color="#FF6094EA" Offset="0" />
+                        <GradientStop Color="#FFF02FC2" Offset="1" />
                     </LinearGradientBrush>
                 </TextBlock.Foreground>
                 <TextBlock.Effect>
-                    <DropShadowEffect Opacity="0.1" Color="Black" />
+                    <DropShadowEffect Color="Black" Opacity="0.1" />
                 </TextBlock.Effect>
             </TextBlock>
             <TextBlock
-                VerticalAlignment="Bottom"
                 FontSize="20"
                 Foreground="#FFF02FC2"
                 IsHitTestVisible="False"
                 Opacity="0.8"
-                Text="{Binding SourceNameText}" />
+                Text="{Binding SourceNameText}"
+                VerticalAlignment="Bottom" />
         </StackPanel>
         <Border
-            Grid.Row="1"
             Classes="Hover"
+            Grid.Row="1"
             IsVisible="{Binding IsVideoBorderVisible}"
             Theme="{StaticResource CardBorder}">
             <StackPanel Spacing="4">
                 <Grid ColumnDefinitions="*,*">
                     <u:Form LabelPosition="Left" LabelWidth="*">
-                        <TextBlock u:FormItem.Label="类型：" Text="{Binding VideoDetail.Type}" />
-                        <TextBlock u:FormItem.Label="地区：" Text="{Binding VideoDetail.Area}" />
+                        <TextBlock Text="{Binding VideoDetail.Type}" u:FormItem.Label="类型：" />
+                        <TextBlock Text="{Binding VideoDetail.Area}" u:FormItem.Label="地区：" />
                         <TextBlock
-                            u:FormItem.Label="主演："
                             Text="{Binding VideoDetail.Actor}"
-                            TextWrapping="Wrap" />
+                            TextWrapping="Wrap"
+                            u:FormItem.Label="主演：" />
                     </u:Form>
                     <u:Form
                         Grid.Column="1"
                         LabelPosition="Left"
                         LabelWidth="*">
-                        <TextBlock u:FormItem.Label="年份：" Text="{Binding VideoDetail.Year}" />
-                        <TextBlock u:FormItem.Label="导演：" Text="{Binding VideoDetail.Director}" />
+                        <TextBlock Text="{Binding VideoDetail.Year}" u:FormItem.Label="年份：" />
+                        <TextBlock Text="{Binding VideoDetail.Director}" u:FormItem.Label="导演：" />
                         <TextBlock
-                            u:FormItem.Label="备注："
                             Text="{Binding VideoDetail.Remark}"
-                            TextWrapping="Wrap" />
+                            TextWrapping="Wrap"
+                            u:FormItem.Label="备注：" />
                     </u:Form>
                 </Grid>
                 <Border
-                    Height="1"
-                    VerticalAlignment="Bottom"
                     Background="{DynamicResource SemiColorFill2}"
-                    Opacity="0.3" />
+                    Height="1"
+                    Opacity="0.3"
+                    VerticalAlignment="Bottom" />
                 <u:Form>
                     <TextBlock
-                        u:FormItem.Label="简介："
                         Text="{Binding VideoDetail.Desc}"
-                        TextWrapping="Wrap" />
+                        TextWrapping="Wrap"
+                        u:FormItem.Label="简介：" />
                 </u:Form>
             </StackPanel>
         </Border>
         <DockPanel
             Grid.Row="2"
-            Margin="4"
-            HorizontalSpacing="8">
-            <u:IconButton
-                HorizontalAlignment="Left"
-                Command="{Binding ReverseVideosCommand}"
-                Content="倒序排列"
+            HorizontalSpacing="8"
+            Margin="4">
+            <TextBlock
                 DockPanel.Dock="Left"
-                Icon="{StaticResource SemiIconArrowDown}" />
-            <TextBlock VerticalAlignment="Center" Text="{Binding EpisodesCountText}" />
+                Text="{Binding EpisodesCountText}"
+                VerticalAlignment="Center" />
             <u:IconButton
+                Command="{Binding ToggleSelectAllCommand}"
+                Content="全选/取消全选"
+                DockPanel.Dock="Left"
+                HorizontalAlignment="Left"
+                Icon="{StaticResource SemiIconTvCheckedStroked}"
+                IsVisible="{Binding IsDownloadingSelected}" />
+            <u:IconButton
+                Classes="Success"
+                Command="{Binding DownloadSelectedCommand}"
+                Content="开始下载"
+                DockPanel.Dock="Left"
+                HorizontalAlignment="Left"
+                Icon="{StaticResource SemiIconFilledArrowDown}"
+                IsVisible="{Binding IsDownloadingSelected}" />
+            <TextBlock
+                DockPanel.Dock="Left"
+                IsVisible="{Binding IsDownloadingSelected}"
+                VerticalAlignment="Center">
+                <Run Text="已选中：" />
+                <Run Text="{Binding SelectedEpisodeCount}" />
+                <Run Text="集" />
+            </TextBlock>
+
+
+            <u:IconToggleButton
+                Content="下载本地"
+                DockPanel.Dock="Right"
                 HorizontalAlignment="Right"
+                Icon="{StaticResource SemiIconDownload}"
+                IsChecked="{Binding IsDownloadingSelected}" />
+            <u:IconButton
                 Command="{Binding CopyLinksCommand}"
                 Content="复制链接"
                 DockPanel.Dock="Right"
+                HorizontalAlignment="Right"
                 Icon="{StaticResource SemiIconCopy}" />
         </DockPanel>
 
@@ -107,27 +135,34 @@
             <ItemsControl HorizontalAlignment="Left" ItemsSource="{Binding Episodes}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="tvvm:EpisodeSubjectItem">
-
-                        <Button
-                            Width="120"
-                            Margin="0,4"
-                            Padding="0"
-                            Classes="EpisodeCard"
-                            Command="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).PlayCommand}"
-                            CommandParameter="{Binding}">
-                            <Button.Styles>
-                                <Style Selector="Button.EpisodeCard:pointerover">
-                                    <Setter Property="RenderTransform" Value="scale(1.05,1.05)" />
-                                </Style>
-                            </Button.Styles>
-                            <TextBlock Classes.Warning="{Binding Watched}" Text="{Binding Name}">
-                                <TextBlock.Styles>
-                                    <Style Selector="TextBlock.Warning">
-                                        <Setter Property="ToolTip.Tip" Value="已经看过" />
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <CheckBox
+                                Command="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).SelectChangedCommand}"
+                                IsChecked="{Binding IsSelected}"
+                                IsVisible="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).IsDownloadingSelected}"
+                                Theme="{StaticResource SimpleCheckBox}"
+                                VerticalAlignment="Center" />
+                            <Button
+                                Classes="EpisodeCard"
+                                Command="{Binding $parent[UserControl].((tvvm:TVShowDetailViewModel)DataContext).PlayCommand}"
+                                CommandParameter="{Binding}"
+                                Margin="0,4"
+                                Padding="0"
+                                Width="120">
+                                <Button.Styles>
+                                    <Style Selector="Button.EpisodeCard:pointerover">
+                                        <Setter Property="RenderTransform" Value="scale(1.05,1.05)" />
                                     </Style>
-                                </TextBlock.Styles>
-                            </TextBlock>
-                        </Button>
+                                </Button.Styles>
+                                <TextBlock Classes.Warning="{Binding Watched}" Text="{Binding Name}">
+                                    <TextBlock.Styles>
+                                        <Style Selector="TextBlock.Warning">
+                                            <Setter Property="ToolTip.Tip" Value="已经看过" />
+                                        </Style>
+                                    </TextBlock.Styles>
+                                </TextBlock>
+                            </Button>
+                        </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 <ItemsControl.ItemsPanel>

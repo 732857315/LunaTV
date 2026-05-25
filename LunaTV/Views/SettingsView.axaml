@@ -5,9 +5,10 @@
     x:Class="LunaTV.Views.SettingsView"
     x:DataType="vm:SettingsViewModel"
     xmlns="https://github.com/avaloniaui"
+    xmlns:ctrls="clr-namespace:LunaTV.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:fa="clr-namespace:FluentAvalonia.UI.Controls;assembly=FluentAvalonia"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mic="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
     xmlns:vm="using:LunaTV.ViewModels"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
@@ -73,136 +74,64 @@
                 </DockPanel>
             </Grid>
 
-            <fa:SettingsExpander
-                Description="改变主题"
-                Header="主题"
-                IconSource="DarkTheme">
+            <ctrls:OptionsDisplayItem Description="改变主题" Header="主题">
+                <ctrls:OptionsDisplayItem.Icon>
+                    <mic:MaterialIcon Kind="ThemeLightDark" />
+                </ctrls:OptionsDisplayItem.Icon>
 
-                <fa:SettingsExpander.Footer>
+                <ctrls:OptionsDisplayItem.ActionButton>
                     <ComboBox
                         ItemsSource="{Binding AppThemes}"
                         MinWidth="150"
                         SelectedItem="{Binding CurrentAppTheme}" />
-                </fa:SettingsExpander.Footer>
+                </ctrls:OptionsDisplayItem.ActionButton>
 
-            </fa:SettingsExpander>
+            </ctrls:OptionsDisplayItem>
 
-            <fa:SettingsExpander
-                Description="改变导航布局"
-                Header="布局"
-                IconSource="AlignRight">
-
-                <fa:SettingsExpander.Footer>
+            <ctrls:OptionsDisplayItem Description="改变导航布局" Header="布局">
+                <ctrls:OptionsDisplayItem.Icon>
+                    <mic:MaterialIcon Kind="AlignHorizontalRight" />
+                </ctrls:OptionsDisplayItem.Icon>
+                <ctrls:OptionsDisplayItem.ActionButton>
                     <ComboBox
                         ItemsSource="{Binding AppFlowDirections}"
                         MinWidth="150"
                         SelectedItem="{Binding CurrentFlowDirection}" />
-                </fa:SettingsExpander.Footer>
+                </ctrls:OptionsDisplayItem.ActionButton>
 
-            </fa:SettingsExpander>
-
-            <fa:SettingsExpander
-                Description="系统配色"
-                Header="主题色"
-                IconSource="ColorLine"
-                IsExpanded="False">
-
-                <fa:SettingsExpanderItem Content="Preview">
-                    <fa:SettingsExpanderItem.Footer>
-                        <Grid
-                            ColumnDefinitions="*,*"
-                            Grid.Column="1"
-                            HorizontalAlignment="Right"
-                            RowDefinitions="*,*,*,*">
-                            <Border
-                                Background="{DynamicResource SystemAccentColor}"
-                                Grid.ColumnSpan="2"
-                                Height="40">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="SystemAccentColor"
-                                    VerticalAlignment="Center" />
-                            </Border>
-
-                            <Border
-                                Background="{DynamicResource SystemAccentColorLight1}"
-                                Grid.Column="0"
-                                Grid.Row="1"
-                                Height="40"
-                                Width="90">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="Light1"
-                                    VerticalAlignment="Center" />
-                            </Border>
-                            <Border
-                                Background="{DynamicResource SystemAccentColorLight2}"
-                                Grid.Column="0"
-                                Grid.Row="2"
-                                Height="40"
-                                Width="90">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="Light2"
-                                    VerticalAlignment="Center" />
-                            </Border>
-                            <Border
-                                Background="{DynamicResource SystemAccentColorLight3}"
-                                Grid.Column="0"
-                                Grid.Row="3"
-                                Height="40"
-                                Width="90">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="Light3"
-                                    VerticalAlignment="Center" />
-                            </Border>
-
-                            <Border
-                                Background="{DynamicResource SystemAccentColorDark1}"
-                                Grid.Column="1"
-                                Grid.Row="1"
-                                Height="40"
-                                Width="90">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="Dark1"
-                                    VerticalAlignment="Center" />
-                            </Border>
-                            <Border
-                                Background="{DynamicResource SystemAccentColorDark2}"
-                                Grid.Column="1"
-                                Grid.Row="2"
-                                Height="40"
-                                Width="90">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="Dark2"
-                                    VerticalAlignment="Center" />
-                            </Border>
-                            <Border
-                                Background="{DynamicResource SystemAccentColorDark3}"
-                                Grid.Column="1"
-                                Grid.Row="3"
-                                Height="40"
-                                Width="90">
-                                <TextBlock
-                                    Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
-                                    HorizontalAlignment="Center"
-                                    Text="Dark3"
-                                    VerticalAlignment="Center" />
-                            </Border>
+            </ctrls:OptionsDisplayItem>
+            <ctrls:OptionsDisplayItem
+                Expands="True"
+                Header="硬件信息"
+                IsExpanded="True">
+                <ctrls:OptionsDisplayItem.Icon>
+                    <mic:MaterialIcon Kind="DeveloperBoard" />
+                </ctrls:OptionsDisplayItem.Icon>
+                <ctrls:OptionsDisplayItem.Content>
+                    <StackPanel Margin="32,16">
+                        <StackPanel.Styles>
+                            <Style Selector="TextBlock,SelectableTextBlock">
+                                <Setter Property="Margin" Value="16,8" />
+                            </Style>
+                        </StackPanel.Styles>
+                        <Grid ColumnDefinitions="*,*">
+                            <TextBlock
+                                Classes="H6"
+                                Text="CPU信息"
+                                Theme="{StaticResource TitleTextBlock}" />
+                            <SelectableTextBlock Grid.Column="1" Text="--" />
                         </Grid>
-                    </fa:SettingsExpanderItem.Footer>
-                </fa:SettingsExpanderItem>
+                        <Grid ColumnDefinitions="*,*">
+                            <TextBlock
+                                Classes="H6"
+                                Text="显卡信息"
+                                Theme="{StaticResource TitleTextBlock}" />
+                            <SelectableTextBlock Grid.Column="1" Text="--" />
+                        </Grid>
+                    </StackPanel>
+                </ctrls:OptionsDisplayItem.Content>
+            </ctrls:OptionsDisplayItem>
 
-            </fa:SettingsExpander>
         </StackPanel>
     </ScrollViewer>
 

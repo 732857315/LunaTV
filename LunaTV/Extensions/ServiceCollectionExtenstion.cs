@@ -2,14 +2,15 @@
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using CommunityToolkit.Mvvm.Messaging;
 using LunaTV.Base.Api;
 using LunaTV.Base.Constants;
 using LunaTV.Base.DB;
 using LunaTV.Constants;
 using LunaTV.Services;
 using LunaTV.ViewModels;
+using LunaTV.ViewModels.TVShowPages;
 using LunaTV.Views;
+using LunaTV.Views.TVShowPages;
 using Microsoft.Extensions.DependencyInjection;
 using Refit;
 
@@ -26,15 +27,6 @@ public static class ServiceCollectionExtenstion
     /// <param name="serviceCollection"></param>
     public static void AddServices(this IServiceCollection serviceCollection)
     {
-        // 主窗口
-        serviceCollection.AddSingleton<MainWindow>();
-        serviceCollection.AddSingleton<MainView>();
-        serviceCollection.AddSingleton<Lazy<MainWindow>>(provider =>
-            new Lazy<MainWindow>(provider.GetRequiredService<MainWindow>));
-        serviceCollection.AddSingleton<Lazy<MainView>>(provider =>
-            new Lazy<MainView>(provider.GetRequiredService<MainView>));
-        serviceCollection.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
-
         // 影视资源查找
         serviceCollection.AddScoped<MovieTvService>();
 
@@ -64,7 +56,9 @@ public static class ServiceCollectionExtenstion
             {
                 if (!response.IsSuccessStatusCode)
                     // var error = await response.Content.ReadAsStringAsync();
+                {
                     Console.WriteLine($"API 错误: {response.StatusCode}");
+                }
 
                 return null;
             }
@@ -119,25 +113,10 @@ public static class ServiceCollectionExtenstion
     public static void AddViewModels(this IServiceCollection serviceCollection)
     {
         // page view model
-        serviceCollection.AddTransient<TVShowViewModel>();
         serviceCollection.AddTransient<SettingsViewModel>();
-        serviceCollection.AddTransient<PlaygroundViewModel>();
-        // serviceCollection.AddTransient<TransferEverythingViewModel>();
-        serviceCollection.AddSingleton<MainViewModel>(provider =>
-            new MainViewModel
-            {
-                Pages =
-                {
-                    provider.GetRequiredService<TVShowViewModel>(),
-                    provider.GetRequiredService<PlaygroundViewModel>(),
-                    // provider.GetRequiredService<TransferEverythingViewModel>(),
-                },
-                FooterPages =
-                {
-                    provider.GetRequiredService<SettingsViewModel>()
-                }
-            }
-        );
+        serviceCollection.AddTransient<TVShowHistoryViewModel>();
+        serviceCollection.AddSingleton<MainViewModel>();
+        serviceCollection.AddSingleton<TVDownloadViewModel>();
     }
 
     /// <summary>
@@ -146,10 +125,24 @@ public static class ServiceCollectionExtenstion
     /// <param name="serviceCollection"></param>
     public static void AddViews(this IServiceCollection serviceCollection)
     {
-        serviceCollection.AddTransient<TVShowView>();
-        serviceCollection.AddSingleton<SettingsView>();
-        serviceCollection.AddTransient<PlaygroundView>();
-        // serviceCollection.AddTransient<TransferEverythingView>();
+        // 主窗口
+        serviceCollection.AddSingleton<MainWindow>();
+        serviceCollection.AddSingleton<MainView>();
+        serviceCollection.AddSingleton<TVDownloadView>(provider =>
+            new TVDownloadView
+            {
+                DataContext = provider.GetRequiredService<TVDownloadViewModel>()
+            });
+        serviceCollection.AddTransient<SettingsView>(provider =>
+            new SettingsView
+            {
+                DataContext = provider.GetRequiredService<SettingsViewModel>()
+            });
+        serviceCollection.AddTransient<TVShowHistoryView>(provider =>
+            new TVShowHistoryView
+            {
+                DataContext = provider.GetRequiredService<TVShowHistoryViewModel>()
+            });
     }
 
     /// <summary>

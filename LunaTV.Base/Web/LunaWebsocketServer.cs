@@ -23,9 +23,13 @@ public class LunaWebsocketServer
             .ConfigureContainer(a => { a.AddConsoleLogger(); })
             .ConfigurePlugins(a =>
             {
-                a.UseWebSocket().SetWSUrl(null).UseAutoPong();
-                //a.Add<LunaWebSocketPlugin>();
-                a.Add(typeof(IWebSocketHandshakedPlugin), async (IWebSocket client, HttpContextEventArgs e) =>
+                a.UseWebSocket(options =>
+                {
+                    options.SetUrl("/ws");
+                    options.SetAutoPong(true);
+                });
+
+                a.Add(typeof(IWebSocketConnectedPlugin), async (IWebSocket client, HttpContextEventArgs e) =>
                 {
                     ClinetList.Add(client.Client);
                     await e.InvokeNext();
@@ -54,8 +58,6 @@ public class LunaWebsocketServer
 
                     await e.InvokeNext();
                 });
-
-                a.UseWebSocketReconnection(); //a.Add<MyWebSocketPlugin>();
             }));
         await service.StartAsync();
     }
@@ -87,95 +89,5 @@ public class LunaWebsocketServer
                         await Task.Delay(10);
                     }
             });
-    }
-
-    public class LunaWebSocketPlugin : PluginBase, IWebSocketHandshakingPlugin, IWebSocketHandshakedPlugin,
-        IWebSocketReceivedPlugin
-    {
-        private readonly ILog m_logger;
-
-        public LunaWebSocketPlugin(ILog logger)
-        {
-            m_logger = logger;
-        }
-
-        public async Task OnWebSocketHandshaked(IWebSocket client, HttpContextEventArgs e)
-        {
-            m_logger.Info("WebSocket成功连接");
-            await e.InvokeNext();
-        }
-
-        public async Task OnWebSocketHandshaking(IWebSocket client, HttpContextEventArgs e)
-        {
-            if (client.Client is IHttpSessionClient socketClient)
-            {
-                //服务端
-                var id = socketClient.Id;
-            }
-            else if (client.Client is IHttpClient httpClient)
-            {
-                //客户端
-            }
-
-            m_logger.Info("WebSocket正在连接");
-            await e.InvokeNext();
-        }
-
-        public async Task OnWebSocketReceived(IWebSocket client, WSDataFrameEventArgs e)
-        {
-            switch (e.DataFrame.Opcode)
-            {
-                case WSDataType.Close:
-                {
-                    await client.CloseAsync("断开");
-                }
-                    return;
-                case WSDataType.Ping:
-                    await client.PongAsync(); //收到ping时，一般需要响应pong
-                    break;
-                case WSDataType.Pong:
-                    m_logger.Info("Pong");
-                    break;
-                default:
-                {
-                    //其他报文，需要考虑中继包的情况。所以需要手动合并 WSDataType.Cont类型的包。
-                    //或者使用消息合并器
-                    //获取消息组合器
-                    var messageCombinator = client.GetMessageCombinator();
-                    try
-                    {
-                        //尝试组合
-                        if (messageCombinator.TryCombine(e.DataFrame, out var webSocketMessage))
-                            //组合成功，必须using释放模式
-                            using (webSocketMessage)
-                            {
-                                //合并后的消息
-                                var dataType = webSocketMessage.Opcode;
-
-                                //合并后的完整消息
-                                var data = webSocketMessage.PayloadData;
-
-                                if (dataType == WSDataType.Text)
-                                {
-                                    //按文本处理
-                                }
-                                else if (dataType == WSDataType.Binary)
-                                {
-                                    //按字节处理
-                                }
-                                //可能是其他自定义协议
-                            }
-                    }
-                    catch (Exception ex)
-                    {
-                        m_logger.Exception(ex);
-                        messageCombinator.Clear(); //当组合发生异常时，应该清空组合器数据
-                    }
-                }
-                    break;
-            }
-
-            await e.InvokeNext();
-        }
     }
 }

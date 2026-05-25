@@ -28,7 +28,7 @@ public class MpvPropertyIndexRead<TIndex, T, TRaw>
     public MpvPropertyIndexRead(MpvContext mpv, string name)
     {
         Mpv = mpv;
-        PropertyName = name.CheckNotNullOrEmpty(nameof(name));
+        PropertyName = Check.NotNullOrEmpty(name);
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public class MpvPropertyIndexReadRef<TIndex, T, TRaw>
     public MpvPropertyIndexReadRef(MpvContext mpv, string name)
     {
         Mpv = mpv;
-        PropertyName = name.CheckNotNullOrEmpty(nameof(name));
+        PropertyName = Check.NotNullOrEmpty(name);
     }
 
     /// <summary>
