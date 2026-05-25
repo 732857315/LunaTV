@@ -49,4 +49,8 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
+
+    <Target Condition="'$(RuntimeIdentifier)'=='win-x64' or '$(RuntimeIdentifier)'==''" Name="ExtractZipFiles" AfterTargets="Build">
+        <Exec Command="powershell -Command &quot;Expand-Archive -Path '$(OutputPath)libmpv-2.zip' -DestinationPath '$(OutputPath)' -Force; Remove-Item -Path '$(OutputPath)libmpv-2.zip' -Force&quot;" ContinueOnError="true"/>
+    </Target>
 </Project>
