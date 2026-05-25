@@ -226,17 +226,26 @@
                                 Theme="{StaticResource CardBorder}">
                                 <HeaderedContentControl HorizontalAlignment="Stretch" Theme="{DynamicResource GroupBox}">
                                     <HeaderedContentControl.Header>
-                                        <Panel>
+                                        <DockPanel HorizontalSpacing="4">
                                             <SelectableTextBlock
+                                                DockPanel.Dock="Left"
                                                 HorizontalAlignment="Left"
                                                 Text="自定义API"
                                                 VerticalAlignment="Center" />
                                             <Button
                                                 Command="{Binding AddCustomApiCommand}"
                                                 Content="+"
+                                                DockPanel.Dock="Left"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" />
-                                        </Panel>
+                                            <u:IconButton
+                                                Classes="Colorful Primary"
+                                                Command="{Binding LoadSourceFromCloudCommand}"
+                                                Content="云宫迅音"
+                                                DockPanel.Dock="Right"
+                                                HorizontalAlignment="Right"
+                                                Icon="{StaticResource SemiIconFaceuLogo}" />
+                                        </DockPanel>
                                     </HeaderedContentControl.Header>
                                     <HeaderedContentControl.Content>
                                         <ListBox AutoScrollToSelectedItem="True" ItemsSource="{Binding ApiCustoms}">
@@ -375,7 +384,10 @@
                                             HorizontalAlignment="Left"
                                             Text="网络测试"
                                             VerticalAlignment="Center" />
-                                        <Button HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Button
+                                            Command="{Binding NetworkTestCommand}"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center">
                                             <PathIcon Data="{DynamicResource SemiIconGlobeStroke}" Theme="{DynamicResource InnerPathIcon}" />
                                         </Button>
                                     </Panel>
@@ -397,7 +409,7 @@
                                                     <TextBlock
                                                         DockPanel.Dock="Right"
                                                         HorizontalAlignment="Right"
-                                                        Text="300ms" />
+                                                        Text="{Binding Latency}" />
                                                 </DockPanel>
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>

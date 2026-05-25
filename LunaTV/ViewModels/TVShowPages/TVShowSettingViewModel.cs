@@ -1,6 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
@@ -8,11 +11,13 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LunaTV.Base.DB.UnitOfWork;
 using LunaTV.Base.Models;
 using LunaTV.Constants;
+using LunaTV.Models;
 using LunaTV.ViewModels.Base;
 using LunaTV.Views;
 using LunaTV.Views.TVShowPages;
@@ -25,6 +30,7 @@ namespace LunaTV.ViewModels.TVShowPages;
 public partial class TVShowSettingViewModel : ViewModelBase
 {
     private readonly SugarRepository<ApiSource> _apiSourceTable;
+    private readonly HttpClient _httpClient;
     private readonly SugarRepository<PlayerConfig> _playConfigTable;
     [ObservableProperty] private ObservableCollection<ApiSourceItem> _adultApis;
     [ObservableProperty] private ObservableCollection<ApiCustomItem> _apiCustoms;
@@ -38,6 +44,9 @@ public partial class TVShowSettingViewModel : ViewModelBase
 
     public TVShowSettingViewModel()
     {
+        _httpClient = new HttpClient();
+        _httpClient.Timeout = TimeSpan.FromSeconds(30); // 设置超时时间
+
         _apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
         _playConfigTable = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>();
         SystemSettings = App.Services.GetRequiredService<SettingsView>();
@@ -47,6 +56,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         ApiNets = new ObservableCollection<ApiNetItem>();
         ApiCustoms = new ObservableCollection<ApiCustomItem>();
 
+        Dispatcher.UIThread.InvokeAsync(async () => { await NetworkTest(); });
         RefreshSource();
     }
 
@@ -69,6 +79,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             index += api.IsEnable ? 1 : 0;
             if (api.IsAdult)
+            {
                 AdultApis.Add(new ApiSourceItem
                 {
                     Id = api.Id,
@@ -77,7 +88,9 @@ public partial class TVShowSettingViewModel : ViewModelBase
                     Enable = api.IsEnable,
                     IsCustom = api.IsCustomApi
                 });
+            }
             else
+            {
                 CommonApis.Add(new ApiSourceItem
                 {
                     Id = api.Id,
@@ -86,6 +99,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
                     Enable = api.IsEnable,
                     IsCustom = api.IsCustomApi
                 });
+            }
 
             ApiNets.Add(new ApiNetItem
             {
@@ -97,6 +111,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
             });
 
             if (api.IsCustomApi)
+            {
                 ApiCustoms.Add(new ApiCustomItem
                 {
                     Id = api.Id,
@@ -104,6 +119,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
                     Name = api.Name,
                     IsAdult = api.IsAdult
                 });
+            }
         }
 
         SelectedApiCount = index;
@@ -113,9 +129,13 @@ public partial class TVShowSettingViewModel : ViewModelBase
     private void SelectApi(ApiSourceItem api)
     {
         if (api.Enable)
+        {
             AppConifg.SelectApis.Add(api.Source);
+        }
         else
+        {
             AppConifg.SelectApis.Remove(api.Source);
+        }
 
         _apiSourceTable.Update(it => new ApiSource
         {
@@ -129,9 +149,13 @@ public partial class TVShowSettingViewModel : ViewModelBase
     private void SelectAdultApi(ApiSourceItem api)
     {
         if (api.Enable)
+        {
             AppConifg.SelectAdultApis.Add(api.Source);
+        }
         else
+        {
             AppConifg.SelectAdultApis.Remove(api.Source);
+        }
 
         _apiSourceTable.Update(it => new ApiSource
         {
@@ -379,6 +403,98 @@ public partial class TVShowSettingViewModel : ViewModelBase
         RefreshSource();
     }
 
+    [RelayCommand]
+    private async Task NetworkTest()
+    {
+        foreach (var apiNet in ApiNets)
+        {
+            var latency = await PingUrlAsync(apiNet.Url);
+            apiNet.Latency = latency;
+        }
+    }
+
+    [RelayCommand]
+    private async Task LoadSourceFromCloud()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("https://pz.v88.qzz.io/?format=0&source=full");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Response: {jsonString}");
+
+                // 解析JSON响应
+                var cloudData = JsonSerializer.Deserialize<CloudApiSourceResponse>(jsonString, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (cloudData != null)
+                {
+                    var cloudApiSources = new List<ApiSource>();
+                    // 处理云端数据
+                    foreach (var (source, site) in cloudData.ApiSite)
+                    {
+                        cloudApiSources.Add(new ApiSource
+                        {
+                            Source = source,
+                            ApiBaseUrl = site.Api,
+                            DetailBaseUrl = site.Api.StartsWith(site.Detail) ? null : site.Detail,
+                            Name = site.Name,
+                            IsAdult = site.Name.Contains("🔞"),
+                            IsCustomApi = false,
+                            IsEnable = false
+                        });
+                    }
+
+                    // _apiSourceTable全部删除后插入
+                    // 删除所有API源数据后插入
+                    await _apiSourceTable.AsDeleteable().Where(s => true).ExecuteCommandAsync(); // 删除所有记录
+                    await _apiSourceTable.InsertRangeAsync(cloudApiSources);
+                    RefreshSource();
+                    var apiSources1 = await _apiSourceTable.GetListAsync();
+                    AppConifg.UpdateSites(apiSources1);
+                }
+            }
+            else
+            {
+                Console.WriteLine($"HTTP请求失败: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"加载云端源失败: {ex.Message}");
+        }
+    }
+
+    private async Task<string> PingUrlAsync(string? url)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            return "N/A";
+        }
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var response = await _httpClient.GetAsync(url);
+            stopwatch.Stop();
+            if (response.IsSuccessStatusCode)
+            {
+                return $"{stopwatch.ElapsedMilliseconds}ms";
+            }
+
+            return "N/A";
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Ping failed for {url}: {ex.Message}");
+            return "N/A";
+        }
+    }
+
     partial void OnDoubanApiEnabledChanged(bool value)
     {
         AppConifg.PlayerConfig.DoubanApiEnabled = value;
@@ -407,8 +523,10 @@ public partial class ApiSourceItem : ObservableObject
     public bool IsCustom { get; set; }
 }
 
-public class ApiNetItem
+public partial class ApiNetItem : ObservableObject
 {
+    [ObservableProperty] private string? _latency = "待测试";
+
     public int IndexId { get; set; }
     public int Id { get; set; }
     public string? Name { get; set; }

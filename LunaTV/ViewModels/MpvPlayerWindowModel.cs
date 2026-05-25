@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Avalonia.Collections;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
 using Avalonia.Threading;
@@ -13,7 +11,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HanumanInstitute.LibMpv;
 using HanumanInstitute.LibMpv.Core;
-using LunaTV.Base.Models;
 using LunaTV.Constants;
 using LunaTV.ViewModels.Base;
 using LunaTV.ViewModels.TVShowPages;
@@ -34,56 +31,84 @@ public class SpeedMenuItemViewModel
 
 public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 {
-    [ObservableProperty] private string _mediaUrl = "https://vip.dytt-luck.com/20250827/19457_e0c4ac2b/index.m3u8";
-    [ObservableProperty] private int _volume = 70;
-    [ObservableProperty] private double _speed = 1.0f; //0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0
-    [ObservableProperty] private string _speedText = "1x";
-    [ObservableProperty] private bool _loop; //循环播放
-    [ObservableProperty] private bool _isMediaLoaded;
-    [ObservableProperty] private bool _isMuted;
-    [ObservableProperty] private TimeSpan _position = TimeSpan.Zero;
-    [ObservableProperty] private TimeSpan _duration = TimeSpan.FromSeconds(1);
-    [ObservableProperty] private bool _isPlaying;
-    [ObservableProperty] private string? _title = "无";
-    [ObservableProperty] private int _kanBanWidth;
-    [ObservableProperty] private bool _isVideosKanbanChecked;
-
-    public Window? Window { get; set; }
-
     private readonly LoadingWaitViewModel _loadingWaitViewModel = new();
 
-    public IList<SpeedMenuItemViewModel> SpeedMenuItems { get; } = new List<SpeedMenuItemViewModel>();
-
-    public MpvContext Mpv { get; set; } = default!;
-    public WindowNotificationManager? Notification { get; set; }
+    private bool _disposed;
+    [ObservableProperty] private TimeSpan _duration = TimeSpan.FromSeconds(1);
 
     // /// <summary>
     // /// Occurs after the media player is initialized.
     // /// </summary>
     // public event EventHandler? MediaPlayerInitialized;
     private bool _isLoaded;
+    [ObservableProperty] private bool _isMediaLoaded;
+    [ObservableProperty] private bool _isMuted;
+    [ObservableProperty] private bool _isPlaying;
     private bool _isSettingPosition;
+    [ObservableProperty] private bool _isVideosKanbanChecked;
+    [ObservableProperty] private int _kanBanWidth;
+    [ObservableProperty] private bool _loop; //循环播放
+    [ObservableProperty] private string _mediaUrl = "https://vip.dytt-luck.com/20250827/19457_e0c4ac2b/index.m3u8";
+    [ObservableProperty] private TimeSpan _position = TimeSpan.Zero;
+    [ObservableProperty] private double _speed = 1.0f; //0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0
+    [ObservableProperty] private string _speedText = "1x";
 
-    /// <summary>
-    /// Gets or sets whether the user is dragging the seek bar.
-    /// </summary>
-    public bool IsSeekBarPressed { get; set; }
+    private PlaybackStatus _status;
+    [ObservableProperty] private string? _title = "无";
+    [ObservableProperty] private int _volume = 70;
 
     public MpvPlayerWindowModel()
     {
-        for (int i = 8; i >= 1; i--)
+        for (var i = 8; i >= 1; i--)
         {
             SpeedMenuItems.Add(
-                new SpeedMenuItemViewModel()
+                new SpeedMenuItemViewModel
                 {
                     Header = $"{i * 0.5}x",
                     Command = SpeedChangeCommand,
-                    CommandParameter = i * 0.5,
+                    CommandParameter = i * 0.5
                 }
             );
         }
 
         DbServiceInit();
+    }
+
+    public Window? Window { get; set; }
+
+    public IList<SpeedMenuItemViewModel> SpeedMenuItems { get; } = new List<SpeedMenuItemViewModel>();
+
+    public MpvContext Mpv { get; set; } = default!;
+    public WindowNotificationManager? Notification { get; set; }
+
+    /// <summary>
+    ///     Gets or sets whether the user is dragging the seek bar.
+    /// </summary>
+    public bool IsSeekBarPressed { get; set; }
+
+    public PlaybackStatus Status
+    {
+        get => _status;
+        protected set
+        {
+            SetProperty(ref _status, value);
+            var text = _status switch
+            {
+                PlaybackStatus.Loading => "Loading...",
+                PlaybackStatus.Playing => $"{ViewHistory.Name}-{ViewHistory.Episode}",
+                PlaybackStatus.Error => "Error loading media",
+                _ => ""
+            };
+
+            Notification?.Show(new Notification("播放信息", text),
+                NotificationType.Information);
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 
     public async Task OnWindowLoaded()
@@ -98,27 +123,6 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         await Mpv.Volume.SetAsync(Volume, options);
         await Mpv.Speed.SetAsync(Speed, options);
         await Mpv.LoopFile.SetAsync(Loop ? "yes" : "no", options);
-    }
-
-    private PlaybackStatus _status;
-
-    public PlaybackStatus Status
-    {
-        get => _status;
-        protected set
-        {
-            SetProperty(ref _status, value);
-            var text = _status switch
-            {
-                PlaybackStatus.Loading => "Loading...",
-                PlaybackStatus.Playing => Path.GetFileName(MediaUrl),
-                PlaybackStatus.Error => "Error loading media",
-                _ => ""
-            };
-
-            Notification?.Show(new Notification("播放信息", text, NotificationType.Information),
-                NotificationType.Information);
-        }
     }
 
     public async Task PlayPause()
@@ -206,7 +210,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
     public void ChangeVolume(int value)
     {
-        int newVolume = Volume + value;
+        var newVolume = Volume + value;
         if (newVolume < 0)
         {
             newVolume = 0;
@@ -259,7 +263,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
             Mpv.ScreenshotToFile(Path.Combine(path, $"{DateTime.Now:yyyyMMddHHmmssfff}.png"))
                 .Invoke();
-            Notification?.Show(new Notification("截图已保存到", path, NotificationType.Information),
+            Notification?.Show(new Notification("截图已保存到", path),
                 NotificationType.Information);
         }
     }
@@ -299,7 +303,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
     private void PlayerFileLoaded(object? sender, EventArgs e)
     {
-        Dispatcher.UIThread.Post((() =>
+        Dispatcher.UIThread.Post(() =>
         {
             _loadingWaitViewModel.Close();
 
@@ -320,7 +324,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             {
                 SetPositionNoSeek(TimeSpan.Zero);
             }
-        }));
+        });
     }
 
     private void PlayerEndFile(object? sender, MpvEndFileEventArgs e)
@@ -347,7 +351,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
 
     /// <summary>
-    /// Sets the position without raising PositionChanged.
+    ///     Sets the position without raising PositionChanged.
     /// </summary>
     /// <param name="pos">The position value to set.</param>
     private void SetPositionNoSeek(TimeSpan pos)
@@ -429,15 +433,16 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
         _loadingWaitViewModel.TimerStart();
 
-        await Dialog.ShowModal<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, Window, options: options);
+        await Dialog.ShowModal<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, Window, options);
     }
 
-    private bool _disposed;
-
     /// <summary>
-    /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+    ///     Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
     /// </summary>
-    /// <param name="disposing">The disposing parameter should be false when called from a finalizer, and true when called from the IDisposable.Dispose method.</param>
+    /// <param name="disposing">
+    ///     The disposing parameter should be false when called from a finalizer, and true when called from
+    ///     the IDisposable.Dispose method.
+    /// </param>
     private void Dispose(bool disposing)
     {
         if (!_disposed)
@@ -452,11 +457,5 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
             _disposed = true;
         }
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
     }
 }

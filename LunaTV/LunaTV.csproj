@@ -8,8 +8,8 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <Version>0.9.4</Version>
-        <AssemblyVersion>0.9.4.1</AssemblyVersion>
+        <Version>0.9.5</Version>
+        <AssemblyVersion>0.9.5.0</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>

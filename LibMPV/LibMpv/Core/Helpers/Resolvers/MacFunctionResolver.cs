@@ -22,7 +22,10 @@ public class MacFunctionResolver : FunctionResolverBase
         return new[]
         {
             MpvApi.RootPath,
-            "/usr/local/lib"
+            "/opt/local/lib",
+            "/usr/local/lib",
+            "/opt/homebrew/lib",
+            "/opt/lib"
         };
     }
 
