@@ -1,4 +1,5 @@
 using Avalonia;
+using System;
 using System.Runtime.InteropServices;
 using Ursa.Controls;
 
@@ -32,6 +33,12 @@ public partial class MainWindow : UrsaWindow
         //     await player.LoadFile("/Users/x/Downloads/图片文字去除.mp4");
         //     player.Play();
         // });
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        DoubanVerifyWindow.CloseAll();
+        base.OnClosed(e);
     }
 
     private void ApplyPlatformSpecificMargin()

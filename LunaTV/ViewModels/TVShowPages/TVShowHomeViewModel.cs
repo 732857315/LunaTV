@@ -270,6 +270,13 @@ public partial class TVShowHomeViewModel : ViewModelBase
             .GetchDoubanSearchSuggestions(query);
     }
 
+    private static bool IsDoubanVerificationRequired(Exception exception)
+    {
+        return exception is ApiException { StatusCode: HttpStatusCode.Forbidden } ||
+               exception is InvalidOperationException { Message: var message } &&
+               message.Contains("豆瓣验证窗口未返回有效数据", StringComparison.Ordinal);
+    }
+
     private static string NormalizeDoubanImageUrl(string? imageUrl)
     {
         if (string.IsNullOrWhiteSpace(imageUrl)) return string.Empty;
@@ -404,7 +411,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
         }
         catch (Exception e)
         {
-            if (e is ApiException { StatusCode: HttpStatusCode.Forbidden })
+            if (IsDoubanVerificationRequired(e))
             {
                 OpenDoubanVerifyWindow(true);
             }
@@ -424,6 +431,9 @@ public partial class TVShowHomeViewModel : ViewModelBase
     {
         if (_doubanVerifyWindow is not null)
         {
+            if (showNotification)
+                App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，完成后可隐藏窗口。", NotificationType.Warning), NotificationType.Warning);
+
             _doubanVerifyWindow.Show();
             _doubanVerifyWindow.Activate();
             return;
