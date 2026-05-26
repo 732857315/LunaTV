@@ -6,7 +6,6 @@
     x:DataType="vm:TVShowHomeViewModel"
     xmlns="https://github.com/avaloniaui"
     xmlns:asyncImageLoader="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
-    xmlns:converters="clr-namespace:LunaTV.Converters"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:mic="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
@@ -15,7 +14,6 @@
     xmlns:vm="using:LunaTV.ViewModels.TVShowPages"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
-        <converters:ShareWidthConverter x:Key="ShareWidthConverter" />
         <sys:Double x:Key="SearchInputHeight">60</sys:Double>
     </UserControl.Resources>
     <UserControl.Styles>
@@ -139,16 +137,32 @@
                         <!-- <RadioButton Content="成人故事" CornerRadius="20" /> -->
                     </StackPanel>
                 </Border>
-                <u:IconButton
-                    Background="{DynamicResource SemiPink3}"
-                    Command="{Binding MoreMovieOrTvCommand}"
-                    Content="换一批"
-                    CornerRadius="10"
+                <StackPanel
                     DockPanel.Dock="Right"
-                    Foreground="{DynamicResource SemiColorText1}"
                     HorizontalAlignment="Right"
-                    Icon="{StaticResource SemiIconRefresh}"
-                    IconPlacement="Right" />
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <TextBlock Text="每页" VerticalAlignment="Center" />
+                    <CheckBox
+                        Content="自动"
+                        IsChecked="{Binding IsAutoPageSize}"
+                        VerticalAlignment="Center" />
+                    <TextBox
+                        IsEnabled="{Binding IsManualPageSizeEnabled}"
+                        Text="{Binding ManualPageSize}"
+                        VerticalAlignment="Center"
+                        Width="60" />
+                    <TextBlock Text="条" VerticalAlignment="Center" />
+                    <u:IconButton
+                        Background="{DynamicResource SemiPink3}"
+                        Command="{Binding MoreMovieOrTvCommand}"
+                        Content="换一批"
+                        CornerRadius="10"
+                        Foreground="{DynamicResource SemiColorText1}"
+                        HorizontalAlignment="Right"
+                        Icon="{StaticResource SemiIconRefresh}"
+                        IconPlacement="Right" />
+                </StackPanel>
             </DockPanel>
 
             <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto">
@@ -196,7 +210,10 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer
+                Grid.Row="2"
+                Name="MovieCardScrollViewer"
+                VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <ItemsControl HorizontalAlignment="Left" ItemsSource="{Binding MovieCardItems}">
                         <ItemsControl.ItemTemplate>
@@ -222,7 +239,7 @@
                                             </Style>
                                         </Style>
                                     </Button.Styles>
-                                    <StackPanel HorizontalAlignment="Left" Width="{Binding RelativeSource={RelativeSource AncestorType=Grid}, Path=Bounds.Width, Converter={StaticResource ShareWidthConverter}, ConverterParameter=150}">
+                                    <StackPanel HorizontalAlignment="Left" Width="{Binding $parent[UserControl].((vm:TVShowHomeViewModel)DataContext).MovieCardWidth}">
                                         <Panel>
                                             <Border ClipToBounds="True" CornerRadius="5,5,0,0">
                                                 <Image

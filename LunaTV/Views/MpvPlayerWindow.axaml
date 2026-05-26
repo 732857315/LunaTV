@@ -77,17 +77,23 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <TextBlock
-            Margin="0,8"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Text="{Binding Title, Mode=OneWay}" />
-        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
-            <Panel>
-                <mpv:MpvView MpvContext="{Binding Mpv}" Renderer="OpenGl" />
+    <Grid ColumnDefinitions="*,Auto">
+        <Panel>
+            <mpv:MpvView MpvContext="{Binding Mpv}" Renderer="OpenGl" />
 
-                <!--  Bottom Toolbar  -->
+            <Border
+                Name="VideoTitleOverlay"
+                Margin="12,8"
+                Padding="16,6"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Background="{DynamicResource SemiGrey1}"
+                CornerRadius="6"
+                ZIndex="2">
+                <TextBlock Text="{Binding Title, Mode=OneWay}" />
+            </Border>
+
+            <!--  Bottom Toolbar  -->
                 <Border
                     Name="PlayBar"
                     Margin="0,0,0,8"
@@ -276,7 +282,6 @@
                     </ScrollViewer>
                 </Grid>
             </Border>
-        </Grid>
     </Grid>
 
 </u:UrsaWindow>

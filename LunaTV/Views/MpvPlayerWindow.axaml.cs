@@ -1,4 +1,5 @@
 ﻿using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -59,6 +60,9 @@ public partial class MpvPlayerWindow : UrsaWindow
 
     private readonly MpvPlayerWindowModel _viewModel;
     private readonly DispatcherTimer _overlayTimer;
+    private readonly DispatcherTimer _fullscreenStateGuardTimer;
+    private Point? _lastPointerPosition;
+    private bool _ignorePointerUntilMoved;
 
     public MpvPlayerWindow()
     {
@@ -77,8 +81,21 @@ public partial class MpvPlayerWindow : UrsaWindow
         _overlayTimer.Tick += (s, e) =>
         {
             _overlayTimer.Stop();
-            PlayBar.IsVisible = false;
+            HideOverlay();
         };
+
+        _fullscreenStateGuardTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _fullscreenStateGuardTimer.Tick += (_, _) =>
+        {
+            _fullscreenStateGuardTimer.Stop();
+            FixBrokenFullScreenState();
+        };
+
+        PositionChanged += (_, _) => ScheduleFullScreenStateCheck();
+        Resized += (_, _) => ScheduleFullScreenStateCheck();
     }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
@@ -116,6 +133,7 @@ public partial class MpvPlayerWindow : UrsaWindow
     {
         _viewModel?.Stop();
         _overlayTimer.Stop();
+        _fullscreenStateGuardTimer.Stop();
         base.OnClosed(e);
         (App.VisualRoot as MainWindow)?.Show();
     }
@@ -130,20 +148,76 @@ public partial class MpvPlayerWindow : UrsaWindow
         _viewModel.IsSeekBarPressed = false;
     }
 
-    private void OnPointerEntered(object? sender, PointerEventArgs e)
+    private void ShowOverlay()
     {
+        PlayBar.IsVisible = true;
+        VideoTitleOverlay.IsVisible = true;
+    }
+
+    private void HideOverlay()
+    {
+        PlayBar.IsVisible = false;
+        VideoTitleOverlay.IsVisible = false;
+        _ignorePointerUntilMoved = true;
+    }
+
+    private void RestartAutoHideOverlay()
+    {
+        _ignorePointerUntilMoved = false;
+        ShowOverlay();
         _overlayTimer.Stop();
         _overlayTimer.Start();
-        PlayBar.IsVisible = true;
+    }
+
+    private void ScheduleFullScreenStateCheck()
+    {
+        if (WindowState != WindowState.FullScreen) return;
+
+        _fullscreenStateGuardTimer.Stop();
+        _fullscreenStateGuardTimer.Start();
+    }
+
+    private void FixBrokenFullScreenState()
+    {
+        if (WindowState != WindowState.FullScreen) return;
+
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen is null) return;
+
+        var screenBounds = screen.Bounds;
+        var clientWidth = ClientSize.Width * DesktopScaling;
+        var clientHeight = ClientSize.Height * DesktopScaling;
+        var isStillFullScreenSized = Math.Abs(clientWidth - screenBounds.Width) < 8 &&
+                                     Math.Abs(clientHeight - screenBounds.Height) < 8;
+
+        if (isStillFullScreenSized) return;
+
+        WindowState = WindowState.Maximized;
+        _overlayTimer.Stop();
+        ShowOverlay();
+    }
+
+    private void OnPointerEntered(object? sender, PointerEventArgs e)
+    {
+        if (_ignorePointerUntilMoved) return;
+        _lastPointerPosition = e.GetPosition(this);
+        RestartAutoHideOverlay();
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        if (!PlayBar.IsVisible)
+        var pointerPosition = e.GetPosition(this);
+        if (_ignorePointerUntilMoved)
         {
-            _overlayTimer.Stop();
-            _overlayTimer.Start();
-            PlayBar.IsVisible = true;
+            if (_lastPointerPosition is { } lastPosition && Math.Abs(pointerPosition.X - lastPosition.X) < 2 && Math.Abs(pointerPosition.Y - lastPosition.Y) < 2)
+            {
+                return;
+            }
+
+            _ignorePointerUntilMoved = false;
         }
+
+        _lastPointerPosition = pointerPosition;
+        if (!PlayBar.IsVisible) RestartAutoHideOverlay();
     }
 }

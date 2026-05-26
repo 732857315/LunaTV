@@ -81,6 +81,62 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     public MpvContext Mpv { get; set; } = default!;
     public WindowNotificationManager? Notification { get; set; }
 
+    private static void IgnoreUnavailableProperty(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (MpvException e) when (e.Message.Contains("property unavailable", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+    }
+
+    private static async Task IgnoreUnavailablePropertyAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (MpvException e) when (e.Message.Contains("property unavailable", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+    }
+
+    private static bool IsNetworkMedia(string? mediaUrl)
+    {
+        return Uri.TryCreate(mediaUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
+    }
+
+    private static string GetReferrer(string mediaUrl)
+    {
+        var uri = new Uri(mediaUrl);
+        return uri.GetLeftPart(UriPartial.Authority) + "/";
+    }
+
+    private async Task ConfigureNetworkPlaybackAsync(string mediaUrl)
+    {
+        if (!IsNetworkMedia(mediaUrl)) return;
+
+        var options = new MpvAsyncOptions { WaitForResponse = false };
+        await IgnoreUnavailablePropertyAsync(() => Mpv.UserAgent.SetAsync(LunaTV.Base.Constants.UserAgent.GetRandomUserAgent(), options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.Referrer.SetAsync(GetReferrer(mediaUrl), options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.NetworkTimeout.SetAsync(Math.Max(5, AppConifg.PlayerConfig.Timeout / 1000.0), options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.Cache.SetAsync(true, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.CachePause.SetAsync(true, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseInitial.SetAsync(true, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseWait.SetAsync(3, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerReadAheadSecs.SetAsync(20, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBytes.SetAsync(50 * 1024 * 1024, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBackBytes.SetAsync(10 * 1024 * 1024, options));
+    }
+
+    private string GetPlaybackErrorText()
+    {
+        var episode = string.IsNullOrWhiteSpace(ViewHistory?.Episode) ? Title : ViewHistory.Episode;
+        return string.IsNullOrWhiteSpace(episode) ? "当前视频无法播放" : $"{episode} 无法播放";
+    }
+
     /// <summary>
     ///     Gets or sets whether the user is dragging the seek bar.
     /// </summary>
@@ -96,12 +152,15 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             {
                 PlaybackStatus.Loading => "Loading...",
                 PlaybackStatus.Playing => ViewHistory != null ? $"{ViewHistory.Name}-{ViewHistory.Episode}" : Title,
-                PlaybackStatus.Error => "Error loading media",
+                PlaybackStatus.Error => GetPlaybackErrorText(),
                 _ => ""
             };
 
-            Notification?.Show(new Notification("播放信息", text),
-                NotificationType.Information);
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            var notificationType = _status == PlaybackStatus.Error ? NotificationType.Warning : NotificationType.Information;
+            var title = _status == PlaybackStatus.Error ? "播放失败" : "播放信息";
+            Notification?.Show(new Notification(title, text), notificationType);
         }
     }
 
@@ -120,9 +179,9 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         Mpv.TimePos.Changed += PlayerPositionChanged;
 
         var options = new MpvAsyncOptions { WaitForResponse = false };
-        await Mpv.Volume.SetAsync(Volume, options);
-        await Mpv.Speed.SetAsync(Speed, options);
-        await Mpv.LoopFile.SetAsync(Loop ? "yes" : "no", options);
+        await IgnoreUnavailablePropertyAsync(() => Mpv.Volume.SetAsync(Volume, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.Speed.SetAsync(Speed, options));
+        await IgnoreUnavailablePropertyAsync(() => Mpv.LoopFile.SetAsync(Loop ? "yes" : "no", options));
     }
 
     public async Task PlayPause()
@@ -134,15 +193,25 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
         if (!_isLoaded)
         {
-            await Mpv!.Stop().InvokeAsync();
-            await Mpv.Pause.SetAsync(false);
+            await IgnoreUnavailablePropertyAsync(() => Mpv!.Stop().InvokeAsync());
+            await IgnoreUnavailablePropertyAsync(() => Mpv.Pause.SetAsync(false));
             if (!string.IsNullOrEmpty(MediaUrl))
             {
                 _ = Loading();
-                await Mpv.LoadFile(MediaUrl!).InvokeAsync();
-                IsPlaying = true;
-                _isLoaded = true;
-                MediaPlayerOnLoaded();
+                try
+                {
+                    await ConfigureNetworkPlaybackAsync(MediaUrl!);
+                    await Mpv.LoadFile(MediaUrl!).InvokeAsync();
+                    IsPlaying = true;
+                    _isLoaded = true;
+                    MediaPlayerOnLoaded();
+                }
+                catch (MpvException)
+                {
+                    _loadingWaitViewModel.Close();
+                    IsPlaying = false;
+                    Status = PlaybackStatus.Error;
+                }
             }
             else
             {
@@ -151,7 +220,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         }
         else
         {
-            await Mpv!.Pause.SetAsync(IsPlaying);
+            await IgnoreUnavailablePropertyAsync(() => Mpv!.Pause.SetAsync(IsPlaying));
             IsPlaying = !IsPlaying;
         }
     }
@@ -174,8 +243,8 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
     public void Stop()
     {
-        Mpv.Pause.Set(false);
-        Mpv!.Stop().Invoke();
+        IgnoreUnavailableProperty(() => Mpv.Pause.Set(false));
+        IgnoreUnavailableProperty(() => Mpv!.Stop().Invoke());
         SpeedChange(1.0f);
         SaveViewHistory();
         Stoped();
@@ -203,7 +272,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             // Position = newPos;
             lock (Mpv)
             {
-                Mpv.TimePos.Set(newPos.TotalSeconds);
+                IgnoreUnavailableProperty(() => Mpv.TimePos.Set(newPos.TotalSeconds));
             }
         }
     }
@@ -231,7 +300,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         {
             lock (Mpv!)
             {
-                Mpv.TimePos.Set(0);
+                IgnoreUnavailableProperty(() => Mpv.TimePos.Set(0));
             }
         }
     }
@@ -245,7 +314,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             lock (Mpv!)
             {
                 // var pos = TimeSpan.FromTicks(Position.Ticks);
-                Mpv.TimePos.Set(Position.TotalSeconds);
+                IgnoreUnavailableProperty(() => Mpv.TimePos.Set(Position.TotalSeconds));
             }
         }
     }
@@ -261,10 +330,17 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
                 Directory.CreateDirectory(path);
             }
 
-            Mpv.ScreenshotToFile(Path.Combine(path, $"{DateTime.Now:yyyyMMddHHmmssfff}.png"))
-                .Invoke();
-            Notification?.Show(new Notification("截图已保存到", path),
-                NotificationType.Information);
+            try
+            {
+                Mpv.ScreenshotToFile(Path.Combine(path, $"{DateTime.Now:yyyyMMddHHmmssfff}.png"))
+                    .Invoke();
+                Notification?.Show(new Notification("截图已保存到", path),
+                    NotificationType.Information);
+            }
+            catch (MpvException)
+            {
+                Notification?.Show(new Notification("截图失败", "当前视频状态暂时不能截图"), NotificationType.Warning);
+            }
         }
     }
 
@@ -291,9 +367,13 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             await Task.Delay(1000);
             IsVideosKanbanChecked = false;
             KanBanWidth = 0;
-            ViewHistory.PlaybackPosition = 0;
-            ViewHistory.Episode = item.Name;
-            ViewHistory.Url = item.Url;
+            if (ViewHistory is not null)
+            {
+                ViewHistory.PlaybackPosition = 0;
+                ViewHistory.Episode = item.Name;
+                ViewHistory.Url = item.Url;
+            }
+
             MediaUrl = item.Url;
             Title = $"{ViewHistory?.Name} {item.Name}";
             Episodes.ToList().ForEach(episode => episode.Watched = episode.Name == item.Name);
@@ -308,14 +388,21 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             _loadingWaitViewModel.Close();
 
             Status = PlaybackStatus.Playing;
-            Duration = TimeSpan.FromSeconds(Mpv!.Duration.Get()!.Value);
+            try
+            {
+                Duration = TimeSpan.FromSeconds(Mpv!.Duration.Get()!.Value);
+            }
+            catch (MpvException e) when (e.Message.Contains("property unavailable", StringComparison.OrdinalIgnoreCase))
+            {
+                Duration = TimeSpan.FromSeconds(1);
+            }
 
             IsMediaLoaded = true;
             if (Duration > TimeSpan.FromSeconds(1))
             {
                 lock (Mpv!)
                 {
-                    Mpv.TimePos.Set(ViewHistory?.PlaybackPosition ?? 0);
+                    IgnoreUnavailableProperty(() => Mpv.TimePos.Set(ViewHistory?.PlaybackPosition ?? 0));
                 }
 
                 SaveViewHistory();
@@ -334,6 +421,11 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             if (e.Reason == MpvEndFileReason.Error)
             {
                 Status = PlaybackStatus.Error;
+                _loadingWaitViewModel.Close();
+                IsPlaying = false;
+                _isLoaded = false;
+                IsMediaLoaded = false;
+                return;
             }
 
             Stop();
@@ -385,30 +477,30 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             lock (Mpv!)
             {
                 var pos = TimeSpan.FromTicks(Math.Max(0, Math.Min(Duration.Ticks, value.Ticks)));
-                Mpv.TimePos.Set(pos.TotalSeconds);
+                IgnoreUnavailableProperty(() => Mpv.TimePos.Set(pos.TotalSeconds));
             }
         }
     }
 
     partial void OnVolumeChanged(int value)
     {
-        Mpv?.Volume.Set(value);
+        if (Mpv is not null) IgnoreUnavailableProperty(() => Mpv.Volume.Set(value));
         SaveVolume();
     }
 
     partial void OnSpeedChanged(double value)
     {
-        Mpv?.Speed.Set(value);
+        if (Mpv is not null) IgnoreUnavailableProperty(() => Mpv.Speed.Set(value));
     }
 
     partial void OnLoopChanged(bool value)
     {
-        Mpv?.LoopFile.Set(value ? "yes" : "no");
+        if (Mpv is not null) IgnoreUnavailableProperty(() => Mpv.LoopFile.Set(value ? "yes" : "no"));
     }
 
     partial void OnIsMutedChanged(bool value)
     {
-        Mpv.Mute.Set(value);
+        if (Mpv is not null) IgnoreUnavailableProperty(() => Mpv.Mute.Set(value));
     }
 
     partial void OnIsVideosKanbanCheckedChanged(bool value)

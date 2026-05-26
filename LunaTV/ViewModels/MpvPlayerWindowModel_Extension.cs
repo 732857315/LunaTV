@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LunaTV.Base.DB.UnitOfWork;
 using LunaTV.Base.Models;
@@ -40,13 +41,19 @@ public partial class MpvPlayerWindowModel
         {
             var videos = await App.Services.GetRequiredService<MovieTvService>()
                 .SearchDetail(source, vodId, AppConifg.AdultApiSitesConfig.ContainsKey(source));
-            Episodes = new ObservableCollection<EpisodeSubjectItem>(videos.Episodes.Select(ep =>
-                new EpisodeSubjectItem
-                {
-                    Watched = ep.Name == name,
-                    Name = ep.Name,
-                    Url = ep.Url
-                }).ToList());
+            if (videos?.Episodes is not { Count: > 0 }) return;
+
+            var episodes = videos.Episodes.Select(ep => new EpisodeSubjectItem
+            {
+                Watched = ep.Name == name,
+                Name = ep.Name,
+                Url = ep.Url
+            }).ToList();
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Episodes = new ObservableCollection<EpisodeSubjectItem>(episodes);
+            });
         });
     }
 

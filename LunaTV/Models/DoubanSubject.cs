@@ -1,32 +1,37 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using LunaTV.Converters;
 
 namespace LunaTV.Models;
 
 public class DoubanSubjectsResponse
 {
-    public List<DoubanSubject> Subjects { get; set; }
+    public List<DoubanSubject> Subjects { get; set; } = [];
 }
 
 public class DoubanSubject
 {
-    [JsonPropertyName("episodes_info")] public string EpisodesInfo { get; set; }
+    [JsonPropertyName("episodes_info")] public string? EpisodesInfo { get; set; }
 
-    [JsonPropertyName("rate")] public string Rate { get; set; }
+    [JsonPropertyName("rate")] public string? Rate { get; set; }
 
-    [JsonPropertyName("cover_x")] public int CoverX { get; set; }
+    [JsonConverter(typeof(FlexibleIntConverter))]
+    [JsonPropertyName("cover_x")]
+    public int CoverX { get; set; }
 
-    [JsonPropertyName("title")] public string Title { get; set; }
+    [JsonPropertyName("title")] public string Title { get; set; } = string.Empty;
 
-    [JsonPropertyName("url")] public string Url { get; set; }
+    [JsonPropertyName("url")] public string Url { get; set; } = string.Empty;
 
     [JsonPropertyName("playable")] public bool Playable { get; set; }
 
-    [JsonPropertyName("cover")] public string Cover { get; set; }
+    [JsonPropertyName("cover")] public string Cover { get; set; } = string.Empty;
 
-    [JsonPropertyName("id")] public string Id { get; set; }
+    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
 
-    [JsonPropertyName("cover_y")] public int CoverY { get; set; }
+    [JsonConverter(typeof(FlexibleIntConverter))]
+    [JsonPropertyName("cover_y")]
+    public int CoverY { get; set; }
 
     [JsonPropertyName("is_new")] public bool IsNew { get; set; }
 }
@@ -41,19 +46,19 @@ public class DoubanSubject
 // "id" : "3014183"
 public class DoubanSuggestionSubject
 {
-    [JsonPropertyName("episode")] public string Episode { get; set; }
+    [JsonPropertyName("episode")] public string? Episode { get; set; }
 
-    [JsonPropertyName("img")] public string Img { get; set; }
+    [JsonPropertyName("img")] public string Img { get; set; } = string.Empty;
 
-    [JsonPropertyName("title")] public string Title { get; set; }
+    [JsonPropertyName("title")] public string Title { get; set; } = string.Empty;
 
-    [JsonPropertyName("url")] public string Url { get; set; }
+    [JsonPropertyName("url")] public string Url { get; set; } = string.Empty;
 
-    [JsonPropertyName("type")] public string Type { get; set; }
+    [JsonPropertyName("type")] public string? Type { get; set; }
 
-    [JsonPropertyName("year")] public string Year { get; set; }
+    [JsonPropertyName("year")] public string? Year { get; set; }
 
-    [JsonPropertyName("sub_title")] public string SubTitle { get; set; }
+    [JsonPropertyName("sub_title")] public string? SubTitle { get; set; }
 
-    [JsonPropertyName("id")] public string Id { get; set; }
+    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
 }

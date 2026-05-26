@@ -19,6 +19,7 @@
     <ItemGroup>
         <PackageReference Include="AsyncImageLoader.Avalonia" Version="3.8.0"/>
         <PackageReference Include="Avalonia" Version="12.0.3"/>
+        <PackageReference Include="Avalonia.Controls.WebView" Version="12.0.1"/>
         <PackageReference Include="Avalonia.Desktop" Version="12.0.3"/>
         <!--Condition below is needed to remove AvaloniaUI.DiagnosticsSupport package from build output in Release configuration.-->
         <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1">

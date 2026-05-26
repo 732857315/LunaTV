@@ -36,7 +36,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
 
     public string? VideoName { get; set; }
     public string? SourceName { get; set; }
-    public string SourceNameText => $"({AppConifg.ApiSitesConfig[SourceName].Name})";
+    public string SourceNameText => GetSourceNameText();
     public DetailResult VideoDetail { get; set; }
     public List<EpisodeSubjectItem> Episodes { get; set; } = new();
     public bool IsVideoBorderVisible { get; set; }
@@ -49,21 +49,31 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
 
     public event EventHandler<object?>? RequestClose;
 
+    private string GetSourceNameText()
+    {
+        if (string.IsNullOrWhiteSpace(SourceName)) return string.Empty;
+        if (AppConifg.ApiSitesConfig.TryGetValue(SourceName, out var site)) return $"({site.Name})";
+        if (AppConifg.AdultApiSitesConfig.TryGetValue(SourceName, out var adultSite)) return $"({adultSite.Name})";
+
+        return $"({SourceName})";
+    }
+
     public void RefreshUi()
     {
-        Episodes = VideoDetail.Episodes.Select(ep => new EpisodeSubjectItem
+        Episodes = VideoDetail.Episodes?.Select(ep => new EpisodeSubjectItem
         {
             Watched = false,
             Name = ep.Name,
             Url = ep.Url,
             IsSelected = true // 默认全部选中
-        }).ToList();
+        }).ToList() ?? [];
         EpisodesCountText = $"共{Episodes.Count}集";
         var viewHistory = _viewHistoryTable.GetSingle(his =>
             his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
         if (viewHistory is not null)
         {
-            Episodes[Episodes.IndexOf(Episodes.FirstOrDefault(ep => ep.Name == viewHistory.Episode))].Watched = true;
+            var watchedEpisode = Episodes.FirstOrDefault(ep => ep.Name == viewHistory.Episode);
+            if (watchedEpisode is not null) watchedEpisode.Watched = true;
         }
 
         SelectChanged();
