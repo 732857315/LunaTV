@@ -330,8 +330,20 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     private static List<DoubanSubject> ParseDoubanSubjects(string json)
     {
-        using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
+        var trimmedJson = json.TrimStart();
+        if (trimmedJson.Length == 0 || trimmedJson[0] is not ('{' or '[' or '"'))
+            throw new InvalidOperationException("豆瓣验证窗口未返回有效数据，请确认验证已完成后再刷新。");
+
+        JsonElement root;
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            root = document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException("豆瓣验证窗口未返回有效数据，请确认验证已完成后再刷新。");
+        }
 
         if (root.ValueKind == JsonValueKind.String)
         {
@@ -357,20 +369,18 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         for (var i = 0; i < requests; i++)
         {
-            string sts;
             try
             {
-                sts = await FetchDoubanSubjectsInternal(_switchMovieOrTv, SelectedTagItem!, "recommend", DoubanPageLimit,
+                var sts = await FetchDoubanSubjectsInternal(_switchMovieOrTv, SelectedTagItem!, "recommend", DoubanPageLimit,
                     _pageStart + i * DoubanPageLimit);
+                var pageSubjects = ParseDoubanSubjects(sts);
+                if (pageSubjects.Count == 0) break;
+                subjects.AddRange(pageSubjects);
             }
-            catch (ApiException e) when (e.StatusCode == HttpStatusCode.Forbidden && subjects.Count > 0)
+            catch (Exception e) when (subjects.Count > 0 && IsDoubanVerificationRequired(e))
             {
                 break;
             }
-
-            var pageSubjects = ParseDoubanSubjects(sts);
-            if (pageSubjects.Count == 0) break;
-            subjects.AddRange(pageSubjects);
         }
 
         return subjects.Take(_pageSize).ToList();
