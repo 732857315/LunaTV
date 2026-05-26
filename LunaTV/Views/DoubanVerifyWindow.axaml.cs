@@ -13,6 +13,7 @@ public partial class DoubanVerifyWindow : Window
     private readonly SemaphoreSlim _apiFetchLock = new(1, 1);
     private TaskCompletionSource<string>? _apiFetchCompletion;
     private bool _forceClose;
+    private bool _waitingForVerification;
 
     public DoubanVerifyWindow()
     {
@@ -27,7 +28,11 @@ public partial class DoubanVerifyWindow : Window
         };
         Closed += (_, _) => Windows.Remove(this);
         DoubanWebView.NewWindowRequested += DoubanWebView_OnNewWindowRequested;
-        DoubanWebView.NavigationCompleted += async (_, _) => await CompleteApiFetchAsync();
+        DoubanWebView.NavigationCompleted += async (_, _) =>
+        {
+            await CompleteApiFetchAsync();
+            AutoHideAfterVerification();
+        };
     }
 
     public DoubanVerifyWindow(Uri source) : this()
@@ -42,6 +47,11 @@ public partial class DoubanVerifyWindow : Window
             window._forceClose = true;
             window.Close();
         }
+    }
+
+    public void WaitForVerification()
+    {
+        _waitingForVerification = true;
     }
 
     public async Task<string> FetchApiAsync(string url)
@@ -84,6 +94,19 @@ public partial class DoubanVerifyWindow : Window
         {
             if (ReferenceEquals(_apiFetchCompletion, completion)) _apiFetchCompletion = null;
         }
+    }
+
+    private void AutoHideAfterVerification()
+    {
+        if (!_waitingForVerification || _apiFetchCompletion is not null) return;
+        if (DoubanWebView.Source is not { } source) return;
+        if (!source.Host.EndsWith("douban.com", StringComparison.OrdinalIgnoreCase)) return;
+        if (source.AbsolutePath.Contains("accounts", StringComparison.OrdinalIgnoreCase)) return;
+        if (source.AbsolutePath.Contains("passport", StringComparison.OrdinalIgnoreCase)) return;
+        if (source.AbsolutePath.Contains("captcha", StringComparison.OrdinalIgnoreCase)) return;
+
+        _waitingForVerification = false;
+        Hide();
     }
 
     private void DoubanWebView_OnNewWindowRequested(object? sender, WebViewNewWindowRequestedEventArgs e)

@@ -439,21 +439,31 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     private void OpenDoubanVerifyWindow(bool showNotification)
     {
+        var owner = App.VisualRoot as MainWindow;
         if (_doubanVerifyWindow is not null)
         {
             if (showNotification)
-                App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，完成后可隐藏窗口。", NotificationType.Warning), NotificationType.Warning);
+                App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，验证成功后窗口会自动隐藏。", NotificationType.Warning), NotificationType.Warning);
 
-            _doubanVerifyWindow.Show();
+            _doubanVerifyWindow.WaitForVerification();
+            _doubanVerifyWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            _doubanVerifyWindow.Topmost = true;
+            _doubanVerifyWindow.Show(owner);
             _doubanVerifyWindow.Activate();
             return;
         }
 
         if (showNotification)
-            App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，完成后可隐藏窗口。", NotificationType.Warning), NotificationType.Warning);
+            App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，验证成功后窗口会自动隐藏。", NotificationType.Warning), NotificationType.Warning);
 
-        _doubanVerifyWindow = new DoubanVerifyWindow();
-        _doubanVerifyWindow.Show();
+        _doubanVerifyWindow = new DoubanVerifyWindow
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Topmost = true
+        };
+        _doubanVerifyWindow.WaitForVerification();
+        _doubanVerifyWindow.Show(owner);
+        _doubanVerifyWindow.Activate();
     }
 
     partial void OnSelectedTagItemChanged(string? value)
