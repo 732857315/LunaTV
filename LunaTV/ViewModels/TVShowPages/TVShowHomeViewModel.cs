@@ -36,6 +36,10 @@ public partial class TVShowHomeViewModel : ViewModelBase
     private int _pageSize = 16;
     private int _autoPageSize = 16;
     private const int DoubanPageLimit = 16;
+    private static readonly JsonSerializerOptions DoubanJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
     private readonly SugarRepository<ApiSource> _apiSourceTable;
 
     private readonly List<string> _defaultMovieTags =
@@ -228,13 +232,16 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     private async Task<string> FetchDoubanSubjectsInternal(string type, string tag, string sort, int limit, int start)
     {
-        if (_doubanVerifyWindow is { IsVisible: true })
+        if (_doubanVerifyWindow is not null)
         {
             var encodedTag = Uri.EscapeDataString(tag);
             var url = $"https://movie.douban.com/j/search_subjects?type={type}&tag={encodedTag}&sort={sort}&page_limit={limit}&page_start={start}";
             var result = await _doubanVerifyWindow.FetchApiAsync(url);
             if (!string.IsNullOrWhiteSpace(result) && !result.StartsWith("<!DOCTYPE"))
+            {
+                _doubanVerifyWindow.Hide();
                 return result;
+            }
 
             throw new InvalidOperationException("豆瓣验证窗口未返回有效数据，请确认验证已完成后再刷新。");
         }
@@ -245,13 +252,16 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     private async Task<string> FetchDoubanSuggestionsInternal(string query)
     {
-        if (_doubanVerifyWindow is { IsVisible: true })
+        if (_doubanVerifyWindow is not null)
         {
             var encodedQuery = Uri.EscapeDataString(query);
             var url = $"https://movie.douban.com/j/subject_suggest?q={encodedQuery}";
             var result = await _doubanVerifyWindow.FetchApiAsync(url);
             if (!string.IsNullOrWhiteSpace(result) && !result.StartsWith("<!DOCTYPE"))
+            {
+                _doubanVerifyWindow.Hide();
                 return result;
+            }
 
             throw new InvalidOperationException("豆瓣验证窗口未返回有效数据，请确认验证已完成后再搜索。");
         }
@@ -311,6 +321,28 @@ public partial class TVShowHomeViewModel : ViewModelBase
         }
     }
 
+    private static List<DoubanSubject> ParseDoubanSubjects(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        if (root.ValueKind == JsonValueKind.String)
+        {
+            var innerJson = root.GetString();
+            return string.IsNullOrWhiteSpace(innerJson) ? [] : ParseDoubanSubjects(innerJson);
+        }
+
+        if (root.ValueKind == JsonValueKind.Array)
+            return JsonSerializer.Deserialize<List<DoubanSubject>>(root.GetRawText(), DoubanJsonOptions) ?? [];
+
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty("subjects", out var subjectsElement) &&
+            subjectsElement.ValueKind == JsonValueKind.Array)
+            return JsonSerializer.Deserialize<List<DoubanSubject>>(subjectsElement.GetRawText(), DoubanJsonOptions) ?? [];
+
+        return [];
+    }
+
     private async Task<List<DoubanSubject>> FetchDoubanSubjectsPageAsync()
     {
         var subjects = new List<DoubanSubject>();
@@ -318,15 +350,20 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         for (var i = 0; i < requests; i++)
         {
-            var sts = await FetchDoubanSubjectsInternal(_switchMovieOrTv, SelectedTagItem!, "recommend", DoubanPageLimit,
-                _pageStart + i * DoubanPageLimit);
-            var json = JsonSerializer.Deserialize<DoubanSubjectsResponse>(sts,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            if (json?.Subjects is null || json.Subjects.Count == 0) break;
-            subjects.AddRange(json.Subjects);
+            string sts;
+            try
+            {
+                sts = await FetchDoubanSubjectsInternal(_switchMovieOrTv, SelectedTagItem!, "recommend", DoubanPageLimit,
+                    _pageStart + i * DoubanPageLimit);
+            }
+            catch (ApiException e) when (e.StatusCode == HttpStatusCode.Forbidden && subjects.Count > 0)
+            {
+                break;
+            }
+
+            var pageSubjects = ParseDoubanSubjects(sts);
+            if (pageSubjects.Count == 0) break;
+            subjects.AddRange(pageSubjects);
         }
 
         return subjects.Take(_pageSize).ToList();
@@ -369,8 +406,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
         {
             if (e is ApiException { StatusCode: HttpStatusCode.Forbidden })
             {
-                App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，完成后在首页刷新即可（请勿关闭验证窗口）。", NotificationType.Warning), NotificationType.Warning);
-                OpenDoubanVerifyWindow();
+                OpenDoubanVerifyWindow(true);
             }
             else
             {
@@ -384,16 +420,19 @@ public partial class TVShowHomeViewModel : ViewModelBase
         _isTagChanged2Refresh = true;
     }
 
-    private void OpenDoubanVerifyWindow()
+    private void OpenDoubanVerifyWindow(bool showNotification)
     {
-        if (_doubanVerifyWindow is { IsVisible: true })
+        if (_doubanVerifyWindow is not null)
         {
+            _doubanVerifyWindow.Show();
             _doubanVerifyWindow.Activate();
             return;
         }
 
+        if (showNotification)
+            App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，完成后可隐藏窗口。", NotificationType.Warning), NotificationType.Warning);
+
         _doubanVerifyWindow = new DoubanVerifyWindow();
-        _doubanVerifyWindow.Closed += (_, _) => _doubanVerifyWindow = null;
         _doubanVerifyWindow.Show();
     }
 

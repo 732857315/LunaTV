@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 
 namespace LunaTV.Views;
 
@@ -13,6 +14,11 @@ public partial class DoubanVerifyWindow : Window
     public DoubanVerifyWindow()
     {
         InitializeComponent();
+        Closing += (_, e) =>
+        {
+            e.Cancel = true;
+            Hide();
+        };
         DoubanWebView.NewWindowRequested += DoubanWebView_OnNewWindowRequested;
         DoubanWebView.NavigationCompleted += async (_, _) => await CompleteApiFetchAsync();
     }
@@ -70,11 +76,16 @@ public partial class DoubanVerifyWindow : Window
         new DoubanVerifyWindow(e.Request).Show();
     }
 
-    private void ReloadButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void ReloadButton_OnClick(object? sender, RoutedEventArgs e)
     {
         _apiFetchCompletion?.TrySetCanceled();
         _apiFetchCompletion = null;
         DoubanWebView.Source = new Uri("about:blank");
         DoubanWebView.Source = new Uri("https://movie.douban.com/");
+    }
+
+    private void HideButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        Hide();
     }
 }

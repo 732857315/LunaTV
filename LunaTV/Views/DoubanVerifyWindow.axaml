@@ -16,6 +16,11 @@
                 Text="请在此窗口完成豆瓣验证，完成后不要关闭窗口，回到首页刷新即可。"
                 VerticalAlignment="Center" />
             <Button
+                Click="HideButton_OnClick"
+                Content="隐藏"
+                DockPanel.Dock="Right"
+                Margin="8,0,0,0" />
+            <Button
                 Click="ReloadButton_OnClick"
                 Content="重新加载"
                 DockPanel.Dock="Right"

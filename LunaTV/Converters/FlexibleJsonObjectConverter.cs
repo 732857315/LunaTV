@@ -26,6 +26,34 @@ public class FlexibleIntConverter : JsonConverter<int>
     }
 }
 
+public class FlexibleBoolConverter : JsonConverter<bool>
+{
+    public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.True:
+                return true;
+            case JsonTokenType.False:
+                return false;
+            case JsonTokenType.Number:
+                return reader.GetInt32() != 0;
+            case JsonTokenType.String:
+                var value = reader.GetString();
+                if (bool.TryParse(value, out var boolValue)) return boolValue;
+                if (int.TryParse(value, out var intValue)) return intValue != 0;
+                return false;
+        }
+
+        throw new JsonException("无法转换成布尔值");
+    }
+
+    public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options)
+    {
+        writer.WriteBooleanValue(value);
+    }
+}
+
 public class FlexibleStringConverter : JsonConverter<string>
 {
     public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

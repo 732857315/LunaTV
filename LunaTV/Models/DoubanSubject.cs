@@ -23,7 +23,9 @@ public class DoubanSubject
 
     [JsonPropertyName("url")] public string Url { get; set; } = string.Empty;
 
-    [JsonPropertyName("playable")] public bool Playable { get; set; }
+    [JsonConverter(typeof(FlexibleBoolConverter))]
+    [JsonPropertyName("playable")]
+    public bool Playable { get; set; }
 
     [JsonPropertyName("cover")] public string Cover { get; set; } = string.Empty;
 
@@ -33,7 +35,9 @@ public class DoubanSubject
     [JsonPropertyName("cover_y")]
     public int CoverY { get; set; }
 
-    [JsonPropertyName("is_new")] public bool IsNew { get; set; }
+    [JsonConverter(typeof(FlexibleBoolConverter))]
+    [JsonPropertyName("is_new")]
+    public bool IsNew { get; set; }
 }
 
 // "episode" : "50",
