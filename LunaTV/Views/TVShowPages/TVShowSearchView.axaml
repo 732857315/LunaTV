@@ -10,20 +10,18 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:LunaTV.Models"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
     xmlns:tvvm="using:LunaTV.ViewModels.TVShowPages"
     xmlns:u="https://irihi.tech/ursa"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <UserControl.Resources>
         <converters:ShareWidthConverter x:Key="ShareWidthConverter" />
-        <sys:Double x:Key="SearchInputHeight">60</sys:Double>
     </UserControl.Resources>
     <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
         <TextBox
             Classes="clearButton Large"
             Margin="0,30,0,0"
+            PlaceholderText="爸爸快来"
             Text="{Binding InputMovieTvName}"
-            Watermark="爸爸快来"
             Width="400">
             <TextBox.KeyBindings>
                 <KeyBinding
@@ -35,7 +33,7 @@
                 <CheckBox
                     IsChecked="{Binding IsAdultMode}"
                     IsVisible="{Binding IsAdultVisible}"
-                    ToolTip.Tip="成人世界" />
+                    ToolTip.Tip="异度世界" />
             </TextBox.InnerLeftContent>
 
             <TextBox.InnerRightContent>
@@ -67,16 +65,16 @@
                 Theme="{DynamicResource BorderlessButton}" />
         </DockPanel>
 
-        <ItemsControl
+        <ListBox
             Grid.Row="2"
             ItemsSource="{Binding HistoryMovies}"
             Width="600">
-            <ItemsControl.ItemsPanel>
+            <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel ItemSpacing="4" Orientation="Horizontal" />
                 </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
                         <Button
@@ -99,13 +97,30 @@
 
                     </StackPanel>
                 </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
-        <TextBlock
+        <StackPanel
             Grid.Row="3"
             HorizontalAlignment="Right"
-            Text="{Binding SearchCountText}" />
+            Orientation="Horizontal"
+            Spacing="8">
+            <TextBlock VerticalAlignment="Center">
+                <Run Text="共 " />
+                <Run Text="{Binding TotalVideos}" />
+                <Run Text=" 条" />
+            </TextBlock>
+            <ComboBox
+                Classes="Bordered"
+                ItemsSource="{Binding PageSizeOptions}"
+                SelectedItem="{Binding PageSizeSelected}" />
+            <u:IconButton
+                Classes="Secondary"
+                Content="正在搜索..."
+                IsLoading="{Binding IsSearching}"
+                IsVisible="{Binding IsSearching}" />
+        </StackPanel>
+
         <ScrollViewer Grid.Row="4">
             <ItemsControl HorizontalAlignment="Left" ItemsSource="{Binding SearchResults}">
                 <ItemsControl.ItemTemplate>
@@ -198,10 +213,7 @@
             CurrentPage="{Binding CurrentPage}"
             Grid.Row="5"
             HorizontalAlignment="Center"
-            Name="page"
-            PageSize="{Binding PageSize, Mode=OneWay}"
-            PageSizeOptions="10, 20, 50, 100"
-            ShowPageSizeSelector="False"
+            PageSize="{Binding PageSize, Mode=TwoWay}"
             ShowQuickJump="True"
             TotalCount="{Binding TotalVideos, Mode=OneWay}" />
     </Grid>

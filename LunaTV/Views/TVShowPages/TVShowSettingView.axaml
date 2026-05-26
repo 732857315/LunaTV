@@ -159,7 +159,7 @@
                                                 <TextBlock
                                                     Classes="Quaternary"
                                                     FontSize="12"
-                                                    Text="成人电影" />
+                                                    Text="异度空间" />
                                                 <Border
                                                     Background="{DynamicResource SemiColorFill2}"
                                                     Grid.Row="1"
@@ -238,13 +238,31 @@
                                                 DockPanel.Dock="Left"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" />
-                                            <u:IconButton
-                                                Classes="Colorful Primary"
-                                                Command="{Binding LoadSourceFromCloudCommand}"
-                                                Content="云宫迅音"
+                                            <u:PopConfirm
+                                                ConfirmCommand="{Binding PinCodeConfirmCommand}"
                                                 DockPanel.Dock="Right"
-                                                HorizontalAlignment="Right"
-                                                Icon="{StaticResource SemiIconFaceuLogo}" />
+                                                PopupHeader="身形还是鹤形？">
+                                                <u:IconButton
+                                                    Classes="Colorful Primary"
+                                                    Content="云宫迅音"
+                                                    DockPanel.Dock="Right"
+                                                    HorizontalAlignment="Right"
+                                                    Icon="{StaticResource SemiIconFaceuLogo}" />
+                                                <u:PopConfirm.PopupContent>
+                                                    <StackPanel Spacing="8">
+                                                        <u:PinCode
+                                                            CompleteCommand="{Binding PinCodeCompleteCommand}"
+                                                            Count="4"
+                                                            Mode="Digit"
+                                                            PasswordChar="*"
+                                                            u:FormItem.Label="天之语" />
+                                                        <TextBlock
+                                                            Classes="Success"
+                                                            HorizontalAlignment="Center"
+                                                            Text="{Binding PinCodeIndicator}" />
+                                                    </StackPanel>
+                                                </u:PopConfirm.PopupContent>
+                                            </u:PopConfirm>
                                         </DockPanel>
                                     </HeaderedContentControl.Header>
                                     <HeaderedContentControl.Content>

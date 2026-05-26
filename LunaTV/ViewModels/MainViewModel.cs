@@ -126,6 +126,11 @@ public partial class MainViewModel : ViewModelBase
                 _ => null
             };
         }
+
+        if (content == "历史")
+        {
+            App.Services.GetRequiredService<TVShowHistoryViewModel>().RefreshHistoryItems();
+        }
     }
 
     public UserControl GetControl(string name)

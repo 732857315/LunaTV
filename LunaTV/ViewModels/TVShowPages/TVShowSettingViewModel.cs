@@ -40,6 +40,9 @@ public partial class TVShowSettingViewModel : ViewModelBase
     [ObservableProperty] private bool _doubanApiEnabled;
     [ObservableProperty] private bool _forceBaseApiNeedChecked;
     [ObservableProperty] private bool _homeAutoLoadDoubanEnabled;
+
+    private string? _pinCode;
+    [ObservableProperty] private string _pinCodeIndicator = "身形";
     [ObservableProperty] private int _selectedApiCount;
 
     public TVShowSettingViewModel()
@@ -414,11 +417,19 @@ public partial class TVShowSettingViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void PinCodeConfirm()
+    {
+        Dispatcher.UIThread.InvokeAsync(async () => await LoadSourceFromCloud());
+    }
+
     private async Task LoadSourceFromCloud()
     {
         try
         {
-            var response = await _httpClient.GetAsync("https://pz.v88.qzz.io/?format=0&source=full");
+            var cloudUrl = _pinCode == "9527"
+                ? "https://pz.v88.qzz.io/?format=0&source=full"
+                : "https://pz.v88.qzz.io?format=0&source=jin18";
+            var response = await _httpClient.GetAsync(cloudUrl);
 
             if (response.IsSuccessStatusCode)
             {
@@ -467,6 +478,15 @@ public partial class TVShowSettingViewModel : ViewModelBase
         {
             Console.WriteLine($"加载云端源失败: {ex.Message}");
         }
+    }
+
+    [RelayCommand]
+    private async Task PinCodeComplete(IList<string>? obj)
+    {
+        if (obj is null) return;
+        _pinCode = string.Join("", obj);
+
+        PinCodeIndicator = _pinCode == "9527" ? "鹤形" : "身形";
     }
 
     private async Task<string> PingUrlAsync(string? url)
