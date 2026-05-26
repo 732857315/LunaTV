@@ -159,7 +159,7 @@
                                                 <TextBlock
                                                     Classes="Quaternary"
                                                     FontSize="12"
-                                                    Text="成人电影" />
+                                                    Text="酱酱酿酿" />
                                                 <Border
                                                     Background="{DynamicResource SemiColorFill2}"
                                                     Grid.Row="1"
