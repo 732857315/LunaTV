@@ -19,6 +19,7 @@ public class App : Application
     [NotNull] public static Visual? VisualRoot { get; internal set; }
     public static WindowNotificationManager? Notification { get; set; }
     public static WindowToastManager? Toast { get; set; }
+    public static bool IsShuttingDown { get; private set; }
     public static IStorageProvider? StorageProvider { get; internal set; }
     public static TopLevel TopLevel => TopLevel.GetTopLevel(VisualRoot)!;
 
@@ -41,6 +42,7 @@ public class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            desktop.Exit += (_, _) => IsShuttingDown = true;
             var window = ServiceLocator.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
             VisualRoot = window;
@@ -68,9 +70,20 @@ public class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    public static void BeginShutdown()
+    {
+        IsShuttingDown = true;
+    }
+
     private void UIThreadOnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         Console.WriteLine(e.Exception);
+        if (IsShuttingDown)
+        {
+            e.Handled = true;
+            return;
+        }
+
         try
         {
             var win = new CrashWindow(e.Exception.ToString());
@@ -85,6 +98,8 @@ public class App : Application
     private void CurrentDomainOnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         Console.WriteLine(e);
+        if (IsShuttingDown) return;
+
         try
         {
             var win = new CrashWindow(e.ToString() ?? "Unhandled Exception");

@@ -239,7 +239,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
             var result = await _doubanVerifyWindow.FetchApiAsync(url);
             if (!string.IsNullOrWhiteSpace(result) && !result.StartsWith("<!DOCTYPE"))
             {
-                _doubanVerifyWindow.Hide();
+                _doubanVerifyWindow.HideAfterVerification();
                 return result;
             }
 
@@ -259,7 +259,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
             var result = await _doubanVerifyWindow.FetchApiAsync(url);
             if (!string.IsNullOrWhiteSpace(result) && !result.StartsWith("<!DOCTYPE"))
             {
-                _doubanVerifyWindow.Hide();
+                _doubanVerifyWindow.HideAfterVerification();
                 return result;
             }
 

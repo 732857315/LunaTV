@@ -28,11 +28,7 @@ public partial class DoubanVerifyWindow : Window
         };
         Closed += (_, _) => Windows.Remove(this);
         DoubanWebView.NewWindowRequested += DoubanWebView_OnNewWindowRequested;
-        DoubanWebView.NavigationCompleted += async (_, _) =>
-        {
-            await CompleteApiFetchAsync();
-            AutoHideAfterVerification();
-        };
+        DoubanWebView.NavigationCompleted += async (_, _) => await CompleteApiFetchAsync();
     }
 
     public DoubanVerifyWindow(Uri source) : this()
@@ -45,6 +41,8 @@ public partial class DoubanVerifyWindow : Window
         foreach (var window in Windows.ToArray())
         {
             window._forceClose = true;
+            window._apiFetchCompletion?.TrySetCanceled();
+            window._apiFetchCompletion = null;
             window.Close();
         }
     }
@@ -52,6 +50,12 @@ public partial class DoubanVerifyWindow : Window
     public void WaitForVerification()
     {
         _waitingForVerification = true;
+    }
+
+    public void HideAfterVerification()
+    {
+        _waitingForVerification = false;
+        Hide();
     }
 
     public async Task<string> FetchApiAsync(string url)
@@ -94,19 +98,6 @@ public partial class DoubanVerifyWindow : Window
         {
             if (ReferenceEquals(_apiFetchCompletion, completion)) _apiFetchCompletion = null;
         }
-    }
-
-    private void AutoHideAfterVerification()
-    {
-        if (!_waitingForVerification || _apiFetchCompletion is not null) return;
-        if (DoubanWebView.Source is not { } source) return;
-        if (!source.Host.EndsWith("douban.com", StringComparison.OrdinalIgnoreCase)) return;
-        if (source.AbsolutePath.Contains("accounts", StringComparison.OrdinalIgnoreCase)) return;
-        if (source.AbsolutePath.Contains("passport", StringComparison.OrdinalIgnoreCase)) return;
-        if (source.AbsolutePath.Contains("captcha", StringComparison.OrdinalIgnoreCase)) return;
-
-        _waitingForVerification = false;
-        Hide();
     }
 
     private void DoubanWebView_OnNewWindowRequested(object? sender, WebViewNewWindowRequestedEventArgs e)

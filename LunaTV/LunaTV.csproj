@@ -51,7 +51,15 @@
         </Content>
     </ItemGroup>
 
+    <PropertyGroup>
+        <MpvWinX64Zip>$(MSBuildThisFileDirectory)..\LibMPV\MpvDll\win-x64\libmpv-2.zip</MpvWinX64Zip>
+    </PropertyGroup>
+
     <Target Condition="'$(RuntimeIdentifier)'=='win-x64' or '$(RuntimeIdentifier)'==''" Name="ExtractZipFiles" AfterTargets="Build">
-        <Exec Command="powershell -Command &quot;Expand-Archive -Path '$(OutputPath)libmpv-2.zip' -DestinationPath '$(OutputPath)' -Force; Remove-Item -Path '$(OutputPath)libmpv-2.zip' -Force&quot;" ContinueOnError="true"/>
+        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(MpvWinX64Zip)') { Expand-Archive -Path '$(MpvWinX64Zip)' -DestinationPath '$(OutputPath)' -Force }; $copiedZip = Join-Path '$(OutputPath)' 'libmpv-2.zip'; if (Test-Path $copiedZip) { Remove-Item -Path $copiedZip -Force }&quot;" ContinueOnError="true"/>
+    </Target>
+
+    <Target Condition="'$(RuntimeIdentifier)'=='win-x64'" Name="ExtractPublishZipFiles" AfterTargets="Publish">
+        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;if (Test-Path '$(MpvWinX64Zip)') { Expand-Archive -Path '$(MpvWinX64Zip)' -DestinationPath '$(PublishDir)' -Force }; $copiedZip = Join-Path '$(PublishDir)' 'libmpv-2.zip'; if (Test-Path $copiedZip) { Remove-Item -Path $copiedZip -Force }&quot;" ContinueOnError="true"/>
     </Target>
 </Project>
