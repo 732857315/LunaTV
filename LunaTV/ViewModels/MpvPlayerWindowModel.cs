@@ -433,7 +433,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
         _loadingWaitViewModel.TimerStart();
 
-        await Dialog.ShowModal<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, Window, options);
+        await Dialog.ShowStandardAsync<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, Window, options);
     }
 
     /// <summary>

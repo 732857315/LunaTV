@@ -694,10 +694,10 @@ internal class LunaDownloadManager
             var description = item.ToShortShortString();
             _downloadStatus[_taskId] = new DownloadStatus
             {
-                name = DownloaderConfig.MyOptions.SaveName,
-                url = DownloaderConfig.MyOptions.BaseUrl,
-                saveDir = DownloaderConfig.MyOptions.SaveDir,
-                downloadType = DownloadType.None
+                Name = DownloaderConfig.MyOptions.SaveName,
+                Url = DownloaderConfig.MyOptions.BaseUrl,
+                SaveDir = DownloaderConfig.MyOptions.SaveDir,
+                DownloadType = DownloadType.None
             };
             var task = new ProgressTask(_taskId, description, 100, false);
             SpeedContainerDic[_taskId] = new SpeedContainer(); // 速度计算
@@ -803,24 +803,24 @@ internal class LunaDownloadManager
     {
         var ds = _downloadStatus[task.Id];
         // 下载百分比
-        ds.percentage = task.Percentage;
+        ds.Percentage = task.Percentage;
         if (task.IsFinished)
         {
-            ds.downloadType = task.Percentage >= 100 ? DownloadType.Downloaded : DownloadType.DownloadFailed;
+            ds.DownloadType = task.Percentage >= 100 ? DownloadType.Downloaded : DownloadType.DownloadFailed;
         }
         else
         {
-            ds.downloadType = DownloadType.Downloading;
+            ds.DownloadType = DownloadType.Downloading;
         }
 
         if (task.Value <= 0) return;
 
         var speedContainer = speedContainerDic[task.Id];
-        ds.size = speedContainer.RDownloaded;
-        ds.totalSize = speedContainer.SingleSegment
+        ds.Size = speedContainer.RDownloaded;
+        ds.TotalSize = speedContainer.SingleSegment
             ? speedContainer.ResponseLength ?? 0
-            : (long)(ds.size / (task.Value / task.MaxValue));
-        ds.sizeStr = $"{GlobalUtil.FormatFileSize(ds.size)}/{GlobalUtil.FormatFileSize(ds.totalSize)}";
+            : (long)(ds.Size / (task.Value / task.MaxValue));
+        ds.SizeStr = $"{GlobalUtil.FormatFileSize(ds.Size)}/{GlobalUtil.FormatFileSize(ds.TotalSize)}";
 
         speedContainer.NowSpeed = speedContainer.Downloaded;
         // 速度为0，计数增加
@@ -830,17 +830,17 @@ internal class LunaDownloadManager
 
         speedContainer.Reset();
 
-        ds.speed = GlobalUtil.FormatFileSize(speedContainer.NowSpeed) + "ps";
+        ds.Speed = GlobalUtil.FormatFileSize(speedContainer.NowSpeed) + "ps";
 
-        ds.remainingTime = task.RemainingTime;
+        ds.RemainingTime = task.RemainingTime;
 
-        if (!ds.remainingTime.HasValue)
-            ds.remainingTimeStr = "--:--:--";
-        else if (ds.remainingTime.Value.TotalHours > 99.0)
-            ds.remainingTimeStr = "**:**:**";
+        if (!ds.RemainingTime.HasValue)
+            ds.RemainingTimeStr = "--:--:--";
+        else if (ds.RemainingTime.Value.TotalHours > 99.0)
+            ds.RemainingTimeStr = "**:**:**";
         else
-            ds.remainingTimeStr = $"{ds.remainingTime.Value:hh\\:mm\\:ss}";
+            ds.RemainingTimeStr = $"{ds.RemainingTime.Value:hh\\:mm\\:ss}";
 
-        Console.WriteLine($"download {ds.percentage:F2}% {ds.sizeStr} {ds.speed} {ds.remainingTimeStr}");
+        Console.WriteLine($"download {ds.Percentage:F2}% {ds.SizeStr} {ds.Speed} {ds.RemainingTimeStr}");
     }
 }

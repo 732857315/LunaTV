@@ -231,12 +231,28 @@ public class DownloadManager
 
         // 流提取器配置
         var extractor = new StreamExtractor(parserConfig);
-        // 从链接加载内容
-        await RetryUtil.WebRequestRetryAsync(async () =>
+        
+        try
         {
-            await extractor.LoadSourceFromUrlAsync(url);
-            return true;
-        });
+            // 从链接加载内容
+            await RetryUtil.WebRequestRetryAsync(async () =>
+            {
+                await extractor.LoadSourceFromUrlAsync(url);
+                return true;
+            });
+        }
+        catch (Exception e)
+        {
+            DownloadStatus[0] = new DownloadStatus
+            {
+                Name = Option.SaveName,
+                Url = Option.BaseUrl,
+                SaveDir = Option.SaveDir,
+                DownloadType = DownloadType.DownloadFailed
+            };
+            return false;
+        }
+        
         // 解析流信息
         var streams = await extractor.ExtractStreamsAsync();
 

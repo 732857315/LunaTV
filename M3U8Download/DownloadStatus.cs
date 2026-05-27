@@ -10,15 +10,15 @@ public enum DownloadType
 
 public class DownloadStatus
 {
-    public double percentage { get; set; }
-    public long size { get; set; }
-    public long totalSize { get; set; }
-    public string sizeStr { get; set; } = String.Empty;
-    public string speed { get; set; } = String.Empty;
-    public TimeSpan? remainingTime { get; set; }
-    public string remainingTimeStr { get; set; } = string.Empty;
-    public string? name { get; set; }
-    public string? url { get; set; }
-    public string? saveDir { get; set; }
-    public DownloadType downloadType { get; set; } = DownloadType.None;
+    public double Percentage { get; set; }
+    public long Size { get; set; }
+    public long TotalSize { get; set; }
+    public string SizeStr { get; set; } = String.Empty;
+    public string Speed { get; set; } = String.Empty;
+    public TimeSpan? RemainingTime { get; set; }
+    public string RemainingTimeStr { get; set; } = string.Empty;
+    public string? Name { get; set; }
+    public string? Url { get; set; }
+    public string? SaveDir { get; set; }
+    public DownloadType DownloadType { get; set; } = DownloadType.None;
 }

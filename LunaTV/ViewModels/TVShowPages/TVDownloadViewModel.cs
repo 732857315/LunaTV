@@ -94,11 +94,11 @@ public partial class TVDownloadViewModel : ViewModelBase
             {
                 if (MediaDownloadViewModels.Count > 0)
                 {
-                    Console.WriteLine($"等待下载：{MediaDownloadViewModels.Count}");
                     _currentDownloadingMVM =
                         MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
                     if (_currentDownloadingMVM != null)
                     {
+                        Console.WriteLine($"开始下载：{_currentDownloadingMVM.Name}");
                         PreDownload(_currentDownloadingMVM);
                     }
                 }
@@ -110,28 +110,6 @@ public partial class TVDownloadViewModel : ViewModelBase
                     Console.WriteLine($"下载中：{_currentDownloadingMVM.Name}");
                     // 刷新下载进度
                     Downloading(_currentDownloadingMVM);
-                    if (_currentDownloadingMVM.DownloadStatus != DownloadType.Downloading)
-                    {
-                        Console.WriteLine($"下载完成：{_currentDownloadingMVM.Name}");
-                        var md = new MediaDownload
-                        {
-                            Id = _currentDownloadingMVM.Id,
-                            Source = string.Empty,
-                            Name = _currentDownloadingMVM.Name,
-                            Episode = _currentDownloadingMVM.Episode,
-                            Url = _currentDownloadingMVM.Url,
-                            IsDownloaded = true,
-                            LocalPath = _currentDownloadingMVM.LocalPath
-                        };
-                        await _mediaDownloadTable.UpdateAsync(md);
-                        _downloadManagers.Remove(_currentDownloadingMVM.Id);
-                        _currentDownloadingMVM =
-                            MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
-                        if (_currentDownloadingMVM != null)
-                        {
-                            PreDownload(_currentDownloadingMVM);
-                        }
-                    }
                 }
                 else
                 {
@@ -225,7 +203,33 @@ public partial class TVDownloadViewModel : ViewModelBase
         mdvm.DownloadStatus = DownloadType.Downloading;
         _downloadManagers[mdvm.Id] = new DownloadManager();
         mdvm.Status = StatusWord.Downloading;
-        Task.Run(async () => await _downloadManagers[mdvm.Id].DownloadAsync(mdvm.Url!, mdvm.LocalPath!, mdvm.Name!));
+        Task.Run(async () =>
+        {
+            var result = await _downloadManagers[mdvm.Id].DownloadAsync(mdvm.Url!, mdvm.LocalPath!, mdvm.Name!);
+            Downloading(mdvm); // 刷新下载进度
+            var md = new MediaDownload
+            {
+                Id = mdvm.Id,
+                Source = string.Empty,
+                Name = mdvm.Name,
+                Episode = mdvm.Episode,
+                Url = mdvm.Url,
+                IsDownloaded = true,
+                LocalPath = mdvm.LocalPath
+            };
+            await _mediaDownloadTable.UpdateAsync(md);
+            _downloadManagers.Remove(mdvm.Id);
+            mdvm.DownloadStatus = result ? DownloadType.Downloaded : DownloadType.DownloadFailed;
+            mdvm.Status = result ? StatusWord.Downloaded : StatusWord.DownloadFailed;
+            DownloadingCount -= 1;
+            _currentDownloadingMVM =
+                MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
+            if (_currentDownloadingMVM != null)
+            {
+                Console.WriteLine($"开始下载：{_currentDownloadingMVM.Name}");
+                PreDownload(_currentDownloadingMVM);
+            }
+        });
         WaitingCount -= 1;
         DownloadingCount += 1;
     }
@@ -235,25 +239,10 @@ public partial class TVDownloadViewModel : ViewModelBase
         // 开始下载
         if (_downloadManagers[mdvm.Id].DownloadStatus.Count > 0)
         {
-            mdvm.Speed = _downloadManagers[mdvm.Id].DownloadStatus[0].speed;
-            mdvm.SizeStr = _downloadManagers[mdvm.Id].DownloadStatus[0].sizeStr;
-            mdvm.Progress = (int)_downloadManagers[mdvm.Id].DownloadStatus[0].percentage;
-            mdvm.RemainingTime = _downloadManagers[mdvm.Id].DownloadStatus[0].remainingTimeStr;
-            if (_downloadManagers[mdvm.Id].DownloadStatus[0].downloadType != DownloadType.None)
-            {
-                mdvm.DownloadStatus = _downloadManagers[mdvm.Id].DownloadStatus[0].downloadType;
-
-                if (mdvm.DownloadStatus == DownloadType.Downloaded)
-                {
-                    DownloadingCount -= 1;
-                    mdvm.Status = StatusWord.Downloaded;
-                }
-                else if (mdvm.DownloadStatus == DownloadType.DownloadFailed)
-                {
-                    DownloadingCount -= 1;
-                    mdvm.Status = StatusWord.DownloadFailed;
-                }
-            }
+            mdvm.Speed = _downloadManagers[mdvm.Id].DownloadStatus[0].Speed;
+            mdvm.SizeStr = _downloadManagers[mdvm.Id].DownloadStatus[0].SizeStr;
+            mdvm.Progress = (int)_downloadManagers[mdvm.Id].DownloadStatus[0].Percentage;
+            mdvm.RemainingTime = _downloadManagers[mdvm.Id].DownloadStatus[0].RemainingTimeStr;
         }
     }
 

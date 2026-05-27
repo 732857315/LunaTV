@@ -1,17 +1,7 @@
 ﻿<u:UrsaWindow
-    Icon="/Assets/logo-tv.png"
-    IsFullScreenButtonVisible="True"
-    PointerEntered="OnPointerEntered"
-    PointerMoved="OnPointerMoved"
-    Title="LunaTV"
-    WindowStartupLocation="CenterScreen"
-    WindowState="Maximized"
-    d:DesignHeight="450"
-    d:DesignWidth="1000"
-    mc:Ignorable="d"
     x:Class="LunaTV.Views.MpvPlayerWindow"
-    x:DataType="vm:MpvPlayerWindowModel"
     xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:mic="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
@@ -20,7 +10,17 @@
     xmlns:u="https://irihi.tech/ursa"
     xmlns:utils="using:LunaTV.Utils"
     xmlns:vm="using:LunaTV.ViewModels"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    Title="LunaTV"
+    d:DesignHeight="450"
+    d:DesignWidth="1000"
+    x:DataType="vm:MpvPlayerWindowModel"
+    Icon="/Assets/logo-tv.png"
+    IsFullScreenButtonVisible="True"
+    PointerEntered="OnPointerEntered"
+    PointerMoved="OnPointerMoved"
+    WindowStartupLocation="CenterScreen"
+    WindowState="Maximized"
+    mc:Ignorable="d">
     <Window.KeyBindings>
         <KeyBinding Command="{Binding PlayPause}" Gesture="Space" />
         <KeyBinding
@@ -79,47 +79,48 @@
 
     <Grid RowDefinitions="Auto,*">
         <TextBlock
-            HorizontalAlignment="Center"
             Margin="0,8"
-            Text="{Binding Title, Mode=OneWay}"
-            VerticalAlignment="Center" />
-        <Grid ColumnDefinitions="*,Auto" Grid.Row="1">
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            IsVisible="{Binding #PlayBar.IsVisible}"
+            Text="{Binding Title, Mode=OneWay}" />
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
             <Panel>
                 <mpv:MpvView MpvContext="{Binding Mpv}" Renderer="OpenGl" />
 
                 <!--  Bottom Toolbar  -->
                 <Border
-                    HorizontalAlignment="Stretch"
-                    Margin="0,0,0,8"
                     Name="PlayBar"
+                    Margin="0,0,0,8"
+                    HorizontalAlignment="Stretch"
                     VerticalAlignment="Bottom"
                     ZIndex="2">
                     <Grid RowDefinitions="Auto,Auto">
 
                         <!--  Seek Slider  -->
                         <Slider
+                            Name="PART_SeekBar"
+                            Margin="10,0"
+                            VerticalAlignment="Center"
                             Focusable="False"
                             IsHitTestVisible="True"
                             LargeChange="10"
-                            Margin="10,0"
                             Maximum="{Binding Duration, Converter={StaticResource TimeSpanToDoubleConverter}, Mode=OneWay}"
                             Minimum="0"
-                            Name="PART_SeekBar"
                             SmallChange="1"
-                            Value="{Binding Position, Converter={StaticResource TimeSpanToDoubleConverter}}"
-                            VerticalAlignment="Center" />
+                            Value="{Binding Position, Converter={StaticResource TimeSpanToDoubleConverter}}" />
 
-                        <Grid ColumnDefinitions="*,*,*" Grid.Row="1">
+                        <Grid Grid.Row="1" ColumnDefinitions="*,*,*">
                             <StackPanel
                                 Grid.Column="0"
                                 Margin="40,0"
                                 Orientation="Horizontal"
                                 Spacing="4">
                                 <!--  Current Position Display  -->
-                                <TextBlock Text="{Binding Position, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" VerticalAlignment="Center" />
-                                <TextBlock Text="/" VerticalAlignment="Center" />
+                                <TextBlock VerticalAlignment="Center" Text="{Binding Position, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" />
+                                <TextBlock VerticalAlignment="Center" Text="/" />
                                 <!--  Maximum Duration Display  -->
-                                <TextBlock Text="{Binding Duration, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" VerticalAlignment="Center" />
+                                <TextBlock VerticalAlignment="Center" Text="{Binding Duration, Converter={StaticResource TimeSpanToMinutesSecondsConverter}}" />
                             </StackPanel>
                             <StackPanel
                                 Grid.Column="1"
@@ -156,42 +157,42 @@
 
                             <StackPanel
                                 Grid.Column="2"
-                                HorizontalAlignment="Right"
                                 Margin="10,0"
+                                HorizontalAlignment="Right"
                                 Orientation="Horizontal">
                                 <Button
-                                    Command="{Binding ScreenshotCommand}"
                                     Padding="2"
+                                    Command="{Binding ScreenshotCommand}"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="截屏">
                                     <mic:MaterialIcon FontSize="18" Kind="Camera" />
                                 </Button>
                                 <Button
-                                    Background="Transparent"
-                                    Command="{Binding MuteCommand}"
                                     Margin="10,0"
-                                    Padding="2">
+                                    Padding="2"
+                                    Background="Transparent"
+                                    Command="{Binding MuteCommand}">
                                     <mic:MaterialIcon
                                         Classes.MuteIcon="{Binding !IsMuted}"
                                         Classes.UnmuteIcon="{Binding IsMuted}"
                                         FontSize="18" />
                                 </Button>
                                 <Slider
+                                    Width="150"
+                                    Margin="0,0,20,0"
+                                    VerticalAlignment="Center"
                                     Focusable="False"
                                     LargeChange="20"
-                                    Margin="0,0,20,0"
                                     Maximum="100"
                                     SmallChange="5"
-                                    Value="{Binding Volume}"
-                                    VerticalAlignment="Center"
-                                    Width="150" />
+                                    Value="{Binding Volume}" />
                                 <TextBlock
-                                    HorizontalAlignment="Left"
+                                    Width="30"
                                     Margin="-16,0,8,0"
-                                    Text="{Binding Volume, StringFormat={}{0:N0}}"
+                                    HorizontalAlignment="Left"
                                     VerticalAlignment="Center"
-                                    Width="30" />
-                                <TextBlock Text="倍速" VerticalAlignment="Center" />
+                                    Text="{Binding Volume, StringFormat={}{0:N0}}" />
+                                <TextBlock VerticalAlignment="Center" Text="倍速" />
                                 <Button
                                     Classes="TransparentButton Tertiary"
                                     Content="{Binding SpeedText}"
@@ -200,7 +201,7 @@
                                         <MenuFlyout ItemsSource="{Binding SpeedMenuItems}" Placement="Top" />
                                     </Button.Flyout>
                                     <Button.Styles>
-                                        <Style Selector="MenuItem" x:DataType="vm:SpeedMenuItemViewModel">
+                                        <Style x:DataType="vm:SpeedMenuItemViewModel" Selector="MenuItem">
                                             <Setter Property="Header" Value="{Binding Header}" />
                                             <Setter Property="Command" Value="{Binding Command}" />
                                             <Setter Property="CommandParameter" Value="{Binding CommandParameter}" />
@@ -208,10 +209,10 @@
                                     </Button.Styles>
                                 </Button>
                                 <ToggleButton
+                                    Margin="4,0,0,0"
                                     Background="Transparent"
                                     Classes="Tertiary"
-                                    IsChecked="{Binding IsVideosKanbanChecked}"
-                                    Margin="4,0,0,0">
+                                    IsChecked="{Binding IsVideosKanbanChecked}">
                                     <PathIcon Data="{DynamicResource SemiIconKanban}" FontSize="10" />
                                 </ToggleButton>
                             </StackPanel>
@@ -223,20 +224,20 @@
             <Border Grid.Column="1" Width="{Binding KanBanWidth}">
                 <Grid RowDefinitions="Auto,*">
                     <TextBlock
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
                         FontSize="18"
                         FontWeight="ExtraBold"
-                        HorizontalAlignment="Left"
                         IsHitTestVisible="False"
-                        Text="{Binding Title}"
-                        VerticalAlignment="Center">
+                        Text="{Binding Title}">
                         <TextBlock.Foreground>
-                            <LinearGradientBrush EndPoint="100%,100%" StartPoint="0%,0%">
-                                <GradientStop Color="#FF6094EA" Offset="0" />
-                                <GradientStop Color="#FFF02FC2" Offset="1" />
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Offset="0" Color="#FF6094EA" />
+                                <GradientStop Offset="1" Color="#FFF02FC2" />
                             </LinearGradientBrush>
                         </TextBlock.Foreground>
                         <TextBlock.Effect>
-                            <DropShadowEffect Color="Black" Opacity="0.1" />
+                            <DropShadowEffect Opacity="0.1" Color="Black" />
                         </TextBlock.Effect>
                     </TextBlock>
 
@@ -246,12 +247,12 @@
                                 <DataTemplate DataType="tvShowPages:EpisodeSubjectItem">
 
                                     <Button
-                                        Classes="EpisodeCard"
-                                        Command="{Binding $parent[u:UrsaWindow].((vm:MpvPlayerWindowModel)DataContext).KanbanSelectCommand}"
-                                        CommandParameter="{Binding}"
+                                        Width="100"
                                         Margin="0,4"
                                         Padding="0"
-                                        Width="100">
+                                        Classes="EpisodeCard"
+                                        Command="{Binding $parent[u:UrsaWindow].((vm:MpvPlayerWindowModel)DataContext).KanbanSelectCommand}"
+                                        CommandParameter="{Binding}">
                                         <Button.Styles>
                                             <Style Selector="Button.EpisodeCard:pointerover">
                                                 <Setter Property="RenderTransform" Value="scale(1.05,1.05)" />
