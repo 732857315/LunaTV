@@ -38,7 +38,7 @@ public sealed class GlobalDefine
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LunaTV");
 
     public static string DownloadPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LunaTV");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "LunaTV");
 
     /// <summary>
     ///     App数据库连接字符串
