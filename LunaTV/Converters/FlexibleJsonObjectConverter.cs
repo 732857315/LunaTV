@@ -10,6 +10,10 @@ public class FlexibleIntConverter : JsonConverter<int>
     {
         switch (reader.TokenType)
         {
+            // Returning 0 for Null is fine for most fields (e.g., CoverX, CoverY),
+            // but could be ambiguous for fields like Limit/Page where 0 is a valid non-null value.
+            case JsonTokenType.Null:
+                return 0;
             case JsonTokenType.Number:
                 return reader.GetInt32();
             case JsonTokenType.String:
@@ -32,6 +36,8 @@ public class FlexibleBoolConverter : JsonConverter<bool>
     {
         switch (reader.TokenType)
         {
+            case JsonTokenType.Null:
+                return false;
             case JsonTokenType.True:
                 return true;
             case JsonTokenType.False:
@@ -60,13 +66,15 @@ public class FlexibleStringConverter : JsonConverter<string>
     {
         switch (reader.TokenType)
         {
+            case JsonTokenType.Null:
+                return null;
             case JsonTokenType.Number:
                 return reader.GetInt32().ToString();
             case JsonTokenType.String:
                 return reader.GetString();
         }
 
-        throw new JsonException($"无法将{reader.GetString()}转换成整数");
+        throw new JsonException($"无法将{reader.GetString()}转换成字符串");
     }
 
     public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)

@@ -58,7 +58,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         return $"({SourceName})";
     }
 
-    public void RefreshUi()
+    public async Task RefreshUiAsync()
     {
         Episodes = VideoDetail.Episodes?.Select(ep => new EpisodeSubjectItem
         {
@@ -80,7 +80,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
     }
 
     [RelayCommand]
-    private void Play(object? episode)
+    private async Task Play(object? episode)
     {
         if (episode is not EpisodeSubjectItem episodeSubject) return;
 
@@ -96,7 +96,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
             videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>(Episodes);
 
             var viewHistory = _viewHistoryTable.GetSingle(his =>
-                his.VodId == VideoDetail.VodId && his.Source == VideoDetail.Source && his.Name == VideoName);
+                his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
             if (viewHistory is not null)
             {
                 videoModel.ViewHistory = new ViewHistory
@@ -106,7 +106,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
                     Name = VideoName,
                     Episode = episodeSubject.Name,
                     Url = episodeSubject.Url,
-                    Source = VideoDetail.Source,
+                    Source = SourceName,
                     PlaybackPosition = viewHistory.PlaybackPosition,
                     Duration = 0,
                     TotalEpisodeCount = VideoDetail.Episodes.Count,
@@ -121,7 +121,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
                     Name = VideoName,
                     Episode = episodeSubject.Name,
                     Url = episodeSubject.Url,
-                    Source = VideoDetail.Source,
+                    Source = SourceName,
                     PlaybackPosition = 0,
                     Duration = 0,
                     TotalEpisodeCount = VideoDetail.Episodes.Count,

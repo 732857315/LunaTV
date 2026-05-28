@@ -21,7 +21,7 @@
             Classes="clearButton Large"
             Margin="0,30,0,0"
             Text="{Binding InputMovieTvName}"
-            Watermark="爸爸快来"
+            Watermark="搜索影视..."
             Width="400">
             <TextBox.KeyBindings>
                 <KeyBinding

@@ -51,9 +51,11 @@ public partial class TVShowHomeViewModel : ViewModelBase
     private readonly bool _initialized;
 
     private readonly LoadingWaitViewModel _loadingWaitViewModel = new();
+    private readonly SemaphoreSlim _movieCardImageLoadSemaphore = new(4);
     private bool _isRefreshingMovieCards;
     private bool _refreshMovieCardsAgain;
     private CancellationTokenSource? _pageSizeRefreshDebounceTokenSource;
+    private CancellationTokenSource? _naviSearchDebounceCts;
     private DoubanVerifyWindow? _doubanVerifyWindow;
 
     [ObservableProperty] private ObservableCollection<string> _doubanTags;
@@ -190,12 +192,12 @@ public partial class TVShowHomeViewModel : ViewModelBase
         DoubanTags.Clear();
         if (tag == "电影")
         {
-            _defaultMovieTags.ForEach(x => DoubanTags.Add(x));
+            LoadMovieTags().ForEach(x => DoubanTags.Add(x));
             _switchMovieOrTv = "movie";
         }
         else if (tag == "电视")
         {
-            _defaultTvTags.ForEach(x => DoubanTags.Add(x));
+            LoadTvTags().ForEach(x => DoubanTags.Add(x));
             _switchMovieOrTv = "tv";
         }
 
@@ -205,6 +207,46 @@ public partial class TVShowHomeViewModel : ViewModelBase
             await RefreshMovieCardsAsync();
         else
             await RefreshMovieCardsAsync();
+    }
+
+    private List<string> LoadMovieTags()
+    {
+        if (!string.IsNullOrWhiteSpace(AppConifg.PlayerConfig.DoubanMovieTags))
+        {
+            try
+            {
+                var tags = JsonSerializer.Deserialize<List<string>>(AppConifg.PlayerConfig.DoubanMovieTags);
+                if (tags is { Count: > 0 }) return tags;
+            }
+            catch { }
+        }
+        return [.. _defaultMovieTags];
+    }
+
+    private List<string> LoadTvTags()
+    {
+        if (!string.IsNullOrWhiteSpace(AppConifg.PlayerConfig.DoubanTvTags))
+        {
+            try
+            {
+                var tags = JsonSerializer.Deserialize<List<string>>(AppConifg.PlayerConfig.DoubanTvTags);
+                if (tags is { Count: > 0 }) return tags;
+            }
+            catch { }
+        }
+        return [.. _defaultTvTags];
+    }
+
+    private void SaveMovieTags(List<string> tags)
+    {
+        AppConifg.PlayerConfig.DoubanMovieTags = JsonSerializer.Serialize(tags);
+        App.Services.GetRequiredService<SugarRepository<PlayerConfig>>().Update(AppConifg.PlayerConfig);
+    }
+
+    private void SaveTvTags(List<string> tags)
+    {
+        AppConifg.PlayerConfig.DoubanTvTags = JsonSerializer.Serialize(tags);
+        App.Services.GetRequiredService<SugarRepository<PlayerConfig>>().Update(AppConifg.PlayerConfig);
     }
 
     private async Task RefreshMovieCardsAsync()
@@ -230,13 +272,17 @@ public partial class TVShowHomeViewModel : ViewModelBase
         }
     }
 
+    private string GetDoubanSubjectsUrl(string type, string tag, string sort, int limit, int start)
+    {
+        var encodedTag = Uri.EscapeDataString(tag);
+        return $"https://movie.douban.com/j/search_subjects?type={type}&tag={encodedTag}&sort={sort}&page_limit={limit}&page_start={start}";
+    }
+
     private async Task<string> FetchDoubanSubjectsInternal(string type, string tag, string sort, int limit, int start)
     {
         if (_doubanVerifyWindow is not null)
         {
-            var encodedTag = Uri.EscapeDataString(tag);
-            var url = $"https://movie.douban.com/j/search_subjects?type={type}&tag={encodedTag}&sort={sort}&page_limit={limit}&page_start={start}";
-            var result = await _doubanVerifyWindow.FetchApiAsync(url);
+            var result = await _doubanVerifyWindow.FetchApiAsync(GetDoubanSubjectsUrl(type, tag, sort, limit, start));
             if (!string.IsNullOrWhiteSpace(result) && !result.StartsWith("<!DOCTYPE"))
             {
                 _doubanVerifyWindow.HideAfterVerification();
@@ -250,31 +296,186 @@ public partial class TVShowHomeViewModel : ViewModelBase
             .FetchDoubanSubjectsByTag(type, tag, sort, limit, start);
     }
 
-    private async Task<string> FetchDoubanSuggestionsInternal(string query)
+    private async Task<List<DoubanSubject>> SearchDoubanSubjectAsync(string searchText, string cat, CancellationToken cancellationToken = default)
     {
-        if (_doubanVerifyWindow is not null)
+        // 方法1：通过HTML搜索页面获取结果（window.__DATA__）
+        List<DoubanSubject>? htmlResults = null;
+        try
         {
-            var encodedQuery = Uri.EscapeDataString(query);
-            var url = $"https://movie.douban.com/j/subject_suggest?q={encodedQuery}";
-            var result = await _doubanVerifyWindow.FetchApiAsync(url);
-            if (!string.IsNullOrWhiteSpace(result) && !result.StartsWith("<!DOCTYPE"))
-            {
-                _doubanVerifyWindow.HideAfterVerification();
-                return result;
-            }
-
-            throw new InvalidOperationException("豆瓣验证窗口未返回有效数据，请确认验证已完成后再搜索。");
+            htmlResults = await SearchDoubanFromHtmlPageAsync(searchText, cat, cancellationToken);
+            if (htmlResults.Count > 0) return htmlResults;
+            System.Diagnostics.Trace.WriteLine($"[DoubanSearch] HTML页面返回0条结果，尝试标签端点");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[DoubanSearch] HTML搜索页失败: {ex.GetType().Name}: {ex.Message}");
         }
 
-        return await App.Services.GetRequiredService<IWebApi>()
-            .GetchDoubanSearchSuggestions(query);
+        // 方法2：降级使用标签端点
+        try
+        {
+            var sts = await FetchDoubanSubjectsInternal(cat, searchText, "recommend", 50, 0);
+            var tagResults = ParseDoubanSubjects(sts);
+            System.Diagnostics.Trace.WriteLine($"[DoubanSearch] 标签端点返回 {tagResults.Count} 条结果");
+            return tagResults;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[DoubanSearch] 标签端点也失败: {ex.Message}");
+            return htmlResults ?? [];
+        }
     }
+
+    private async Task<List<DoubanSubject>> SearchDoubanFromHtmlPageAsync(string searchText, string cat, CancellationToken cancellationToken = default)
+    {
+        var encodedText = Uri.EscapeDataString(searchText);
+        var url = $"https://movie.douban.com/subject_search?search_text={encodedText}&cat={cat}";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36");
+        request.Headers.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        request.Headers.Add("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8");
+        request.Headers.Add("Referer", "https://movie.douban.com/");
+
+        using var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator,
+            AllowAutoRedirect = true
+        };
+        using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        if ((int)response.StatusCode == 403)
+            throw new InvalidOperationException("豆瓣需要验证，请完成验证后重试。");
+        response.EnsureSuccessStatusCode();
+        var html = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        System.Diagnostics.Trace.WriteLine($"[DoubanSearch] HTML页面长度: {html.Length}, 包含__DATA__: {html.Contains("window.__DATA__")}");
+        var results = ParseDoubanSearchPageHtml(html);
+        System.Diagnostics.Trace.WriteLine($"[DoubanSearch] HTML页面搜索 \"{searchText}\" 获取到 {results.Count} 条结果");
+        return results;
+    }
+
+    private static List<DoubanSubject> ParseDoubanSearchPageHtml(string html)
+    {
+        const string marker = "window.__DATA__";
+        var markerIndex = html.IndexOf(marker, StringComparison.Ordinal);
+        if (markerIndex < 0) return [];
+
+        var eqIndex = html.IndexOf('=', markerIndex + marker.Length);
+        if (eqIndex < 0) return [];
+
+        // Find the start of JSON (first '{' or '[' after '=')
+        var jsonStart = -1;
+        for (var i = eqIndex + 1; i < html.Length; i++)
+        {
+            if (html[i] is '{' or '[')
+            {
+                jsonStart = i;
+                break;
+            }
+        }
+
+        if (jsonStart < 0) return [];
+
+        // Find matching closing brace/bracket
+        var depth = 0;
+        var inString = false;
+        var escape = false;
+        var openChar = html[jsonStart];
+        var closeChar = openChar == '{' ? '}' : ']';
+
+        for (var i = jsonStart; i < html.Length; i++)
+        {
+            var c = html[i];
+            if (escape) { escape = false; continue; }
+            if (c == '\\' && inString) { escape = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+
+            if (c == openChar) depth++;
+            else if (c == closeChar)
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    var jsonStr = html[jsonStart..(i + 1)];
+                    return ParseSearchPageItems(jsonStr);
+                }
+            }
+        }
+
+        return [];
+    }
+
+    private static List<DoubanSubject> ParseSearchPageItems(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // The JSON may be an array directly or an object with "items" property
+            JsonElement itemsElement;
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                itemsElement = root;
+            }
+            else if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("items", out var items))
+            {
+                itemsElement = items;
+            }
+            else
+            {
+                return [];
+            }
+
+            var results = new List<DoubanSubject>();
+            foreach (var item in itemsElement.EnumerateArray())
+            {
+                var title = item.TryGetProperty("title", out var t) ? t.GetString() : null;
+                if (string.IsNullOrWhiteSpace(title)) continue;
+
+                var coverUrl = item.TryGetProperty("cover_url", out var cu) ? cu.GetString() : null;
+                var url = item.TryGetProperty("url", out var u) ? u.GetString() : null;
+                var id = item.TryGetProperty("id", out var idEl)
+                    ? idEl.ValueKind == JsonValueKind.Number ? idEl.GetInt64().ToString() : idEl.GetString()
+                    : null;
+
+                string? rate = null;
+                if (item.TryGetProperty("rating", out var rating) && rating.ValueKind == JsonValueKind.Object &&
+                    rating.TryGetProperty("value", out var value))
+                {
+                    rate = value.ValueKind == JsonValueKind.Number
+                        ? value.GetDouble().ToString("0.#")
+                        : value.GetString();
+                }
+
+                results.Add(new DoubanSubject
+                {
+                    Title = title,
+                    Cover = NormalizeDoubanImageUrl(coverUrl),
+                    Url = url ?? string.Empty,
+                    Id = id ?? string.Empty,
+                    Rate = rate
+                });
+            }
+
+            return results;
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            System.Diagnostics.Trace.WriteLine($"[DoubanSearch] HTML页面JSON解析失败: {ex.Message}");
+            return [];
+        }
+    }
+
 
     private static bool IsDoubanVerificationRequired(Exception exception)
     {
-        return exception is ApiException { StatusCode: HttpStatusCode.Forbidden } ||
-               exception is InvalidOperationException { Message: var message } &&
-               message.Contains("豆瓣验证窗口未返回有效数据", StringComparison.Ordinal);
+        return exception is ApiException { StatusCode: HttpStatusCode.Forbidden }
+               || (exception is InvalidOperationException { Message: var message }
+                   && (message.Contains("豆瓣验证窗口未返回有效数据", StringComparison.Ordinal)
+                       || message.Contains("豆瓣需要验证", StringComparison.Ordinal)));
     }
 
     private static string NormalizeDoubanImageUrl(string? imageUrl)
@@ -352,17 +553,23 @@ public partial class TVShowHomeViewModel : ViewModelBase
         }
 
         if (root.ValueKind == JsonValueKind.Array)
-            return JsonSerializer.Deserialize<List<DoubanSubject>>(root.GetRawText(), DoubanJsonOptions) ?? [];
+        {
+            try { return JsonSerializer.Deserialize<List<DoubanSubject>>(root.GetRawText(), DoubanJsonOptions) ?? []; }
+            catch (JsonException ex) { System.Diagnostics.Trace.WriteLine($"[DoubanParse] JSON解析失败: {ex.Message}"); return []; }
+        }
 
         if (root.ValueKind == JsonValueKind.Object &&
             root.TryGetProperty("subjects", out var subjectsElement) &&
             subjectsElement.ValueKind == JsonValueKind.Array)
-            return JsonSerializer.Deserialize<List<DoubanSubject>>(subjectsElement.GetRawText(), DoubanJsonOptions) ?? [];
+        {
+            try { return JsonSerializer.Deserialize<List<DoubanSubject>>(subjectsElement.GetRawText(), DoubanJsonOptions) ?? []; }
+            catch (JsonException ex) { System.Diagnostics.Trace.WriteLine($"[DoubanParse] JSON解析失败: {ex.Message}"); return []; }
+        }
 
         return [];
     }
 
-    private async Task<List<DoubanSubject>> FetchDoubanSubjectsPageAsync()
+    private async Task<List<DoubanSubject>> FetchDoubanSubjectsPageAsync(Action<List<DoubanSubject>>? onPageLoaded = null)
     {
         var subjects = new List<DoubanSubject>();
         var requests = int.Max(1, (int)Math.Ceiling((double)_pageSize / DoubanPageLimit));
@@ -376,6 +583,8 @@ public partial class TVShowHomeViewModel : ViewModelBase
                 var pageSubjects = ParseDoubanSubjects(sts);
                 if (pageSubjects.Count == 0) break;
                 subjects.AddRange(pageSubjects);
+                onPageLoaded?.Invoke(pageSubjects);
+                if (subjects.Count >= _pageSize) break;
             }
             catch (Exception e) when (subjects.Count > 0 && IsDoubanVerificationRequired(e))
             {
@@ -406,16 +615,61 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         try
         {
-            var subjects = await FetchDoubanSubjectsPageAsync();
+            var loadingClosed = false;
+            var loadedCount = 0;
             MovieCardItems.Clear();
-            foreach (var item in subjects)
+
+            var subjects = await FetchDoubanSubjectsPageAsync(pageSubjects =>
             {
-                MovieCardItems.Add(new MovieCardItem
+                foreach (var item in pageSubjects)
                 {
-                    Name = item.Title,
-                    Image = await GetCachedDoubanImageAsync(item.Cover),
-                    Score = string.IsNullOrEmpty(item.Rate) ? "暂无" : item.Rate,
-                    DoubanUrl = item.Url
+                    if (loadedCount >= _pageSize) return;
+
+                    var card = new MovieCardItem
+                    {
+                        Name = item.Title,
+                        Score = string.IsNullOrEmpty(item.Rate) ? "暂无" : item.Rate,
+                        DoubanUrl = item.Url
+                    };
+                    MovieCardItems.Add(card);
+                    _ = LoadMovieCardImageAsync(card, item.Cover);
+                    loadedCount++;
+                }
+
+                if (!loadingClosed && MovieCardItems.Count > 0)
+                {
+                    _loadingWaitViewModel.Close();
+                    loadingClosed = true;
+                }
+            });
+
+            if (subjects.Count == 0 && _pageStart > 0)
+            {
+                _pageStart = 0;
+                loadedCount = 0;
+                MovieCardItems.Clear();
+                subjects = await FetchDoubanSubjectsPageAsync(pageSubjects =>
+                {
+                    foreach (var item in pageSubjects)
+                    {
+                        if (loadedCount >= _pageSize) return;
+
+                        var card = new MovieCardItem
+                        {
+                            Name = item.Title,
+                            Score = string.IsNullOrEmpty(item.Rate) ? "暂无" : item.Rate,
+                            DoubanUrl = item.Url
+                        };
+                        MovieCardItems.Add(card);
+                        _ = LoadMovieCardImageAsync(card, item.Cover);
+                        loadedCount++;
+                    }
+
+                    if (!loadingClosed && MovieCardItems.Count > 0)
+                    {
+                        _loadingWaitViewModel.Close();
+                        loadingClosed = true;
+                    }
                 });
             }
         }
@@ -435,6 +689,26 @@ public partial class TVShowHomeViewModel : ViewModelBase
         if (_initialized)
             _loadingWaitViewModel.Close();
         _isTagChanged2Refresh = true;
+    }
+
+    private async Task LoadMovieCardImageAsync(MovieCardItem card, string? cover)
+    {
+        await _movieCardImageLoadSemaphore.WaitAsync();
+        try
+        {
+            var image = await GetCachedDoubanImageAsync(cover);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (MovieCardItems.Contains(card)) card.Image = image;
+            });
+        }
+        catch
+        {
+        }
+        finally
+        {
+            _movieCardImageLoadSemaphore.Release();
+        }
     }
 
     private void OpenDoubanVerifyWindow(bool showNotification)
@@ -468,7 +742,54 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     partial void OnSelectedTagItemChanged(string? value)
     {
+        _pageStart = 0;
         if (_isTagChanged2Refresh) _ = RefreshMovieCardsAsync();
+    }
+
+    [RelayCommand]
+    private async Task ManageTags()
+    {
+        var isMovie = _switchMovieOrTv == "movie";
+        var currentTags = isMovie ? LoadMovieTags() : LoadTvTags();
+
+        var vm = new ManageDoubanTagsViewModel
+        {
+            DefaultMovieTags = [.. _defaultMovieTags],
+            DefaultTvTags = [.. _defaultTvTags],
+            IsMovieMode = isMovie
+        };
+        vm.LoadTags(currentTags);
+
+        var options = new DialogOptions
+        {
+            Title = "",
+            Mode = DialogMode.None,
+            Button = DialogButton.OKCancel,
+            ShowInTaskBar = false,
+            IsCloseButtonVisible = true,
+            StartupLocation = WindowStartupLocation.CenterScreen,
+            CanDragMove = false,
+            CanResize = false,
+            StyleClass = ""
+        };
+
+        var result = await Dialog.ShowModal<ManageDoubanTagsView, ManageDoubanTagsViewModel>(vm, options: options);
+        if (result == DialogResult.OK)
+        {
+            var tags = vm.GetTags();
+            if (isMovie)
+                SaveMovieTags(tags);
+            else
+                SaveTvTags(tags);
+
+            // 刷新当前标签列表
+            _isTagChanged2Refresh = false;
+            var selectedTag = SelectedTagItem;
+            DoubanTags.Clear();
+            foreach (var tag in tags) DoubanTags.Add(tag);
+            SelectedTagItem = DoubanTags.Contains(selectedTag ?? "") ? selectedTag : DoubanTags.FirstOrDefault();
+            _isTagChanged2Refresh = true;
+        }
     }
 
     [RelayCommand]
@@ -525,13 +846,47 @@ public partial class TVShowHomeViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private async Task NaviSearchDebounced(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+
+        _naviSearchDebounceCts?.Cancel();
+        _naviSearchDebounceCts = new CancellationTokenSource();
+        var cts = _naviSearchDebounceCts;
+        try { await Task.Delay(400, cts.Token); }
+        catch (OperationCanceledException) { return; }
+        await NaviSearch(text);
+    }
+
+    [RelayCommand]
     private async Task NaviSearch(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
+        _naviSearchDebounceCts?.Cancel();
+
         if (AppConifg.PlayerConfig.DoubanApiEnabled is false)
         {
-            App.Notification?.Show(new Notification("温馨提示", "豆瓣接口未启动"),
-                NotificationType.Information);
+            var mvm = App.Services.GetRequiredService<MainViewModel>();
+            var searchMenuItem = mvm.Items.FirstOrDefault(x => x.Name == "搜索");
+            if (searchMenuItem is null) return;
+
+            mvm.SelectedItem = searchMenuItem;
+            if (mvm.GetControl(searchMenuItem.Name) is not TVShowSearchView { DataContext: TVShowSearchViewModel svm }) return;
+
+            if (svm.IsSearching)
+            {
+                svm.StopCurrentSearch();
+                var timeout = TimeSpan.FromSeconds(5);
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                while (svm.IsSearching && sw.Elapsed < timeout)
+                {
+                    await Task.Delay(100);
+                }
+            }
+
+            svm.InputMovieTvName = text;
+            svm.IsAdultMode = false;
+            await svm.Search(text);
             return;
         }
 
@@ -539,32 +894,52 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         try
         {
-            var sts = await FetchDoubanSuggestionsInternal(text);
-            var json = JsonSerializer.Deserialize<List<DoubanSuggestionSubject>>(sts,
-                new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true // 处理大小写不敏感
-                });
             MovieCardItems.Clear();
-            if (json is not null)
-                foreach (var item in json)
+
+            var subjects = await SearchDoubanSubjectAsync(text, _switchMovieOrTv);
+
+            if (subjects.Count == 0)
+            {
+                App.Notification?.Show(new Notification("未找到", $"未找到与 \"{text}\" 相关的内容"), NotificationType.Information);
+                return;
+            }
+
+            var cards = subjects.Select(item => new MovieCardItem
+            {
+                Name = string.IsNullOrWhiteSpace(item.Year) ? item.Title : $"{item.Title} ({item.Year})",
+                Image = null,
+                Score = string.IsNullOrEmpty(item.Rate) ? "暂无" : item.Rate,
+                DoubanUrl = item.Url
+            }).ToList();
+
+            foreach (var card in cards)
+                MovieCardItems.Add(card);
+
+            _ = Task.WhenAll(cards.Select(async (card, i) =>
+            {
+                try
                 {
-                    MovieCardItems.Add(new MovieCardItem
-                    {
-                        Name = item.Title,
-                        Image = await GetCachedDoubanImageAsync(item.Img),
-                        Score = "暂无",
-                        DoubanUrl = item.Url
-                    });
+                    card.Image = await GetCachedDoubanImageAsync(subjects[i].Cover);
                 }
+                catch { }
+            }));
         }
-        catch (Exception e)
+        catch (OperationCanceledException) { return; }
+        catch (Exception ex)
         {
-            App.Notification?.Show(new Notification("查找失败", "豆瓣检索失败", NotificationType.Error), NotificationType.Error);
+            if (IsDoubanVerificationRequired(ex))
+            {
+                OpenDoubanVerifyWindow(true);
+            }
+            else
+            {
+                App.Notification?.Show(new Notification("查找失败", $"豆瓣检索失败：{ex.Message}"), NotificationType.Error);
+            }
         }
-
-
-        _loadingWaitViewModel.Close();
+        finally
+        {
+            _loadingWaitViewModel.Close();
+        }
     }
 
     public async Task Loading()
@@ -599,6 +974,14 @@ public partial class MovieCardItem : ViewModelBase
 
 
     [RelayCommand]
+    private void OpenDoubanUrl()
+    {
+        if (string.IsNullOrWhiteSpace(DoubanUrl)) return;
+        var window = new WebBrowserWindow(DoubanUrl);
+        window.Show();
+    }
+
+    [RelayCommand]
     private async Task Search(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return;
@@ -612,7 +995,9 @@ public partial class MovieCardItem : ViewModelBase
         if (svm.IsSearching)
         {
             svm.StopCurrentSearch();
-            while (svm.IsSearching)
+            var timeout = TimeSpan.FromSeconds(5);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (svm.IsSearching && sw.Elapsed < timeout)
             {
                 await Task.Delay(100);
             }

@@ -17,4 +17,6 @@ public class PlayerConfig
     public bool DoubanApiEnabled { set; get; } // 豆瓣API
     public bool HomeAutoLoadDoubanEnabled { set; get; } // 首页自动加载豆瓣数据
     public bool ForceApiNeedSpecialSource { set; get; } //强制使用api
+    public string? DoubanMovieTags { set; get; } // 自定义电影标签 (JSON数组)
+    public string? DoubanTvTags { set; get; } // 自定义电视标签 (JSON数组)
 }

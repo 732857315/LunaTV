@@ -45,6 +45,8 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isMuted;
     [ObservableProperty] private bool _isPlaying;
     private bool _isSettingPosition;
+    private DateTime _lastPositionUpdateTime = DateTime.MinValue;
+    private double _lastPositionValue;
     [ObservableProperty] private bool _isVideosKanbanChecked;
     [ObservableProperty] private int _kanBanWidth;
     [ObservableProperty] private bool _loop; //循环播放
@@ -119,16 +121,18 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         if (!IsNetworkMedia(mediaUrl)) return;
 
         var options = new MpvAsyncOptions { WaitForResponse = false };
-        await IgnoreUnavailablePropertyAsync(() => Mpv.UserAgent.SetAsync(LunaTV.Base.Constants.UserAgent.GetRandomUserAgent(), options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.Referrer.SetAsync(GetReferrer(mediaUrl), options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.NetworkTimeout.SetAsync(Math.Max(5, AppConifg.PlayerConfig.Timeout / 1000.0), options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.Cache.SetAsync(true, options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.CachePause.SetAsync(true, options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseInitial.SetAsync(true, options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseWait.SetAsync(3, options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerReadAheadSecs.SetAsync(20, options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBytes.SetAsync(50 * 1024 * 1024, options));
-        await IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBackBytes.SetAsync(10 * 1024 * 1024, options));
+        await IgnoreUnavailablePropertyAsync(() => { Mpv.SetOptionString("cache-secs", "120"); return Task.CompletedTask; });
+        await Task.WhenAll(
+            IgnoreUnavailablePropertyAsync(() => Mpv.UserAgent.SetAsync(LunaTV.Base.Constants.UserAgent.GetRandomUserAgent(), options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.Referrer.SetAsync(GetReferrer(mediaUrl), options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.NetworkTimeout.SetAsync(Math.Max(5, AppConifg.PlayerConfig.Timeout / 1000.0), options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.Cache.SetAsync(true, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.CachePause.SetAsync(true, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseInitial.SetAsync(true, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseWait.SetAsync(5, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerReadAheadSecs.SetAsync(20, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBytes.SetAsync(150 * 1024 * 1024, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBackBytes.SetAsync(30 * 1024 * 1024, options)));
     }
 
     private string GetPlaybackErrorText()
@@ -206,7 +210,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
                     _isLoaded = true;
                     MediaPlayerOnLoaded();
                 }
-                catch (MpvException)
+                catch (Exception)
                 {
                     _loadingWaitViewModel.Close();
                     IsPlaying = false;
@@ -220,6 +224,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         }
         else
         {
+            if (IsPlaying) FlushPendingPosition();
             await IgnoreUnavailablePropertyAsync(() => Mpv!.Pause.SetAsync(IsPlaying));
             IsPlaying = !IsPlaying;
         }
@@ -227,6 +232,8 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
     private void Stoped()
     {
+        FlushPendingPosition();
+
         if (string.IsNullOrEmpty(MediaUrl) && !IsMediaLoaded)
         {
             return;
@@ -352,6 +359,15 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private void ExitFullScreen()
+    {
+        if (Window is not null)
+        {
+            Window.WindowState = WindowState.Maximized;
+        }
+    }
+
+    [RelayCommand]
     private void SpeedChange(double value)
     {
         SpeedText = $"{value}x";
@@ -362,9 +378,8 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     private void KanbanSelect(EpisodeSubjectItem item)
     {
         Stop();
-        Dispatcher.UIThread.InvokeAsync(async () =>
+        Dispatcher.UIThread.InvokeAsync(() =>
         {
-            await Task.Delay(1000);
             IsVideosKanbanChecked = false;
             KanBanWidth = 0;
             if (ViewHistory is not null)
@@ -437,8 +452,24 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     /// MPV播放刷新进度条
     private void PlayerPositionChanged(object? sender, MpvValueChangedEventArgs<double, double> e)
     {
-        // SetPositionNoSeek(TimeSpan.FromSeconds(e.NewValue!.Value));
-        Dispatcher.UIThread.Post(() => SetPositionNoSeek(TimeSpan.FromSeconds(e.NewValue!.Value)));
+        _lastPositionValue = e.NewValue!.Value;
+        var now = DateTime.UtcNow;
+        if ((now - _lastPositionUpdateTime).TotalMilliseconds >= 150)
+        {
+            _lastPositionUpdateTime = now;
+            var pos = TimeSpan.FromSeconds(_lastPositionValue);
+            Dispatcher.UIThread.Post(() => SetPositionNoSeek(pos));
+        }
+    }
+
+    /// <summary>
+    ///     Immediately dispatches the last recorded position to the UI,
+    ///     bypassing the throttle. Call when pausing or stopping.
+    /// </summary>
+    private void FlushPendingPosition()
+    {
+        var pos = TimeSpan.FromSeconds(_lastPositionValue);
+        Dispatcher.UIThread.Post(() => SetPositionNoSeek(pos));
     }
 
 

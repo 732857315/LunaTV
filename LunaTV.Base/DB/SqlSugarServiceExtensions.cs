@@ -64,6 +64,28 @@ public static class SqlSugarServiceExtensions
             });
         }
 
+        if (!db.DbMaintenance.IsAnyColumn("player_config", "DoubanMovieTags"))
+        {
+            db.DbMaintenance.AddColumn("player_config", new DbColumnInfo()
+            {
+                DbColumnName = "DoubanMovieTags",
+                TableName = "player_config",
+                DataType = "varchar(2000)",
+                IsNullable = true
+            });
+        }
+
+        if (!db.DbMaintenance.IsAnyColumn("player_config", "DoubanTvTags"))
+        {
+            db.DbMaintenance.AddColumn("player_config", new DbColumnInfo()
+            {
+                DbColumnName = "DoubanTvTags",
+                TableName = "player_config",
+                DataType = "varchar(2000)",
+                IsNullable = true
+            });
+        }
+
         services.AddSingleton<ISqlSugarClient>(db);
         return services;
     }

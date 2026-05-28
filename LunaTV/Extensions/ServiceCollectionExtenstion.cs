@@ -97,8 +97,8 @@ public static class ServiceCollectionExtenstion
                 {
                     options.Retry.MaxRetryAttempts = 3;
                     options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30); // 总的超时时间
-                    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(5); //每次重试的超时时间
-                    options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30); //熔断时间
+                    options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(15); //每次重试的超时时间
+                    options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(60); //熔断时间
                 }
             );
 

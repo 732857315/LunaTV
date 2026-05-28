@@ -63,6 +63,9 @@ public partial class MpvPlayerWindow : UrsaWindow
     private readonly DispatcherTimer _fullscreenStateGuardTimer;
     private Point? _lastPointerPosition;
     private bool _ignorePointerUntilMoved;
+    private bool _isOverlayVisible = true;
+
+    private static readonly Cursor HiddenCursor = new(StandardCursorType.None);
 
     public MpvPlayerWindow()
     {
@@ -138,6 +141,34 @@ public partial class MpvPlayerWindow : UrsaWindow
         (App.VisualRoot as MainWindow)?.Show();
     }
 
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == WindowStateProperty)
+        {
+            var newState = change.GetNewValue<WindowState>();
+            if (ExitFullScreenButton is not null)
+                ExitFullScreenButton.IsVisible = false;
+
+            if (newState == WindowState.FullScreen)
+            {
+                IsTitleBarVisible = false;
+                _isOverlayVisible = false;
+                PlayBar.IsVisible = false;
+                VideoTitleOverlay.IsVisible = false;
+            }
+            else
+            {
+                IsTitleBarVisible = true;
+                IsCloseButtonVisible = true;
+                IsMinimizeButtonVisible = true;
+                IsRestoreButtonVisible = true;
+                IsFullScreenButtonVisible = true;
+                _isOverlayVisible = true;
+            }
+        }
+    }
+
     private void SeekBarPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         _viewModel.IsSeekBarPressed = true;
@@ -150,21 +181,43 @@ public partial class MpvPlayerWindow : UrsaWindow
 
     private void ShowOverlay()
     {
+        if (_isOverlayVisible) return;
+        _isOverlayVisible = true;
+
         PlayBar.IsVisible = true;
         VideoTitleOverlay.IsVisible = true;
+        IsCloseButtonVisible = true;
+        IsMinimizeButtonVisible = true;
+        IsRestoreButtonVisible = true;
+        IsFullScreenButtonVisible = true;
+        IsTitleBarVisible = true;
+        if (WindowState == WindowState.FullScreen)
+            ExitFullScreenButton.IsVisible = true;
+        Cursor = null;
     }
 
     private void HideOverlay()
     {
+        if (!_isOverlayVisible) return;
+        _isOverlayVisible = false;
+
         PlayBar.IsVisible = false;
         VideoTitleOverlay.IsVisible = false;
+        IsCloseButtonVisible = false;
+        IsMinimizeButtonVisible = false;
+        IsRestoreButtonVisible = false;
+        IsFullScreenButtonVisible = false;
+        ExitFullScreenButton.IsVisible = false;
+        // Do NOT set IsTitleBarVisible = false here — toggling it causes
+        // UrsaWindow layout changes that disrupt MpvView playback.
         _ignorePointerUntilMoved = true;
+        Cursor = HiddenCursor;
     }
 
     private void RestartAutoHideOverlay()
     {
         _ignorePointerUntilMoved = false;
-        ShowOverlay();
+        if (!_isOverlayVisible) ShowOverlay();
         _overlayTimer.Stop();
         _overlayTimer.Start();
     }

@@ -224,6 +224,22 @@
                         </Grid>
                     </Grid>
                 </Border>
+
+                <!--  Exit Fullscreen Button (only visible in fullscreen)  -->
+                <Button
+                    Name="ExitFullScreenButton"
+                    Margin="0,12,12,0"
+                    Padding="6"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    Command="{Binding ExitFullScreenCommand}"
+                    Focusable="False"
+                    IsVisible="False"
+                    ZIndex="3">
+                    <mic:MaterialIcon FontSize="24" Kind="FullscreenExit" />
+                </Button>
             </Panel>
 
             <Border Grid.Column="1" Width="{Binding KanBanWidth}">

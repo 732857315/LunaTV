@@ -90,7 +90,7 @@
                 Text="{Binding SearchInputText}">
                 <TextBox.KeyBindings>
                     <KeyBinding
-                        Command="{Binding NaviSearchCommand}"
+                        Command="{Binding NaviSearchDebouncedCommand}"
                         CommandParameter="{Binding #SearchTextBox.Text}"
                         Gesture="Enter" />
                 </TextBox.KeyBindings>
@@ -171,6 +171,7 @@
                     Orientation="Horizontal"
                     Spacing="10">
                     <u:IconButton
+                        Command="{Binding ManageTagsCommand}"
                         Content="管理标签"
                         Foreground="{DynamicResource SemiCyan6}"
                         Icon="+"
@@ -261,19 +262,19 @@
                                                     Kind="Star" />
                                                 <TextBlock Text="{Binding Score}" />
                                             </StackPanel>
-                                            <HyperlinkButton
+                                            <Button
                                                 Classes="WithIcon"
+                                                Command="{Binding OpenDoubanUrlCommand}"
                                                 Content="豆瓣"
                                                 HorizontalAlignment="Right"
                                                 Margin="4"
-                                                NavigateUri="{Binding DoubanUrl}"
                                                 VerticalAlignment="Bottom">
-                                                <HyperlinkButton.Styles>
-                                                    <Style Selector="HyperlinkButton /template/ DockPanel">
+                                                <Button.Styles>
+                                                    <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
                                                         <Setter Property="Background" Value="{DynamicResource SemiGrey1}" />
                                                     </Style>
-                                                </HyperlinkButton.Styles>
-                                            </HyperlinkButton>
+                                                </Button.Styles>
+                                            </Button>
                                         </Panel>
                                         <Button
                                             Background="{DynamicResource SemiGrey1}"
