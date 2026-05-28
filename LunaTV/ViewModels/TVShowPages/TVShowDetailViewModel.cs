@@ -25,6 +25,7 @@ namespace LunaTV.ViewModels.TVShowPages;
 public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
 {
     private readonly SugarRepository<ViewHistory> _viewHistoryTable;
+    private readonly SugarRepository<MediaDownload> _mediaDownloadTable;
     [ObservableProperty] private bool _isDownloadingSelected;
     [ObservableProperty] private int _selectedEpisodeCount;
 
@@ -32,10 +33,12 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
     public TVShowDetailViewModel()
     {
         _viewHistoryTable = App.Services.GetRequiredService<SugarRepository<ViewHistory>>();
+        _mediaDownloadTable = App.Services.GetRequiredService<SugarRepository<MediaDownload>>();
     }
 
     public string? VideoName { get; set; }
     public string? SourceName { get; set; }
+    public string? Cover { get; set; }
     public string SourceNameText => GetSourceNameText();
     public DetailResult VideoDetail { get; set; }
     public List<EpisodeSubjectItem> Episodes { get; set; } = new();
@@ -68,6 +71,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
             IsSelected = true // 默认全部选中
         }).ToList() ?? [];
         EpisodesCountText = $"共{Episodes.Count}集";
+        await RefreshDownloadStatusAsync();
         var viewHistory = _viewHistoryTable.GetSingle(his =>
             his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
         if (viewHistory is not null)
@@ -77,6 +81,37 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         }
 
         SelectChanged();
+    }
+
+    private async Task RefreshDownloadStatusAsync()
+    {
+        var urls = Episodes
+            .Select(episode => episode.Url)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct()
+            .ToList();
+        if (urls.Count == 0) return;
+
+        var downloadRecords = await _mediaDownloadTable.Context.Queryable<MediaDownload>()
+            .Where(download => download.Url != null && urls.Contains(download.Url) && download.IsDownloaded)
+            .ToListAsync();
+        var downloadRecordsByUrl = downloadRecords
+            .Where(download => !string.IsNullOrWhiteSpace(download.Url))
+            .GroupBy(download => download.Url!)
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(download => download.UpdateTime).First());
+        foreach (var episode in Episodes)
+        {
+            if (string.IsNullOrWhiteSpace(episode.Url) || !downloadRecordsByUrl.TryGetValue(episode.Url, out var download)) continue;
+            var outputFilePath = DownloadFileResolver.ResolveExistingFile(download.OutputFilePath, download.LocalPath, download.Name, download.Episode)
+                                 ?? download.OutputFilePath;
+            episode.IsDownloaded = true;
+            episode.OutputFilePath = outputFilePath;
+            if (!string.IsNullOrWhiteSpace(outputFilePath) && download.OutputFilePath != outputFilePath)
+            {
+                download.OutputFilePath = outputFilePath;
+                await _mediaDownloadTable.UpdateAsync(download);
+            }
+        }
     }
 
     [RelayCommand]
@@ -91,26 +126,37 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         win.Show();
         if (win.DataContext is MpvPlayerWindowModel videoModel)
         {
-            videoModel.MediaUrl = episodeSubject.Url;
-            videoModel.Title = $"{VideoName} {episodeSubject.Name}";
+            var mediaUrl = DownloadFileResolver.ResolveExistingFile(
+                               episodeSubject.OutputFilePath,
+                               Path.GetDirectoryName(episodeSubject.OutputFilePath ?? string.Empty),
+                               VideoName,
+                               episodeSubject.Name)
+                           ?? episodeSubject.Url;
+            episodeSubject.OutputFilePath = mediaUrl;
+            videoModel.MediaUrl = mediaUrl;
+            videoModel.Title = MpvPlayerWindowModel.BuildPlayerTitle(VideoName, episodeSubject.Name);
             videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>(Episodes);
 
+            var cover = string.IsNullOrWhiteSpace(Cover) ? VideoDetail.Cover : Cover;
             var viewHistory = _viewHistoryTable.GetSingle(his =>
                 his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
             if (viewHistory is not null)
             {
+                var isSameEpisode = viewHistory.Episode == episodeSubject.Name;
                 videoModel.ViewHistory = new ViewHistory
                 {
                     Id = viewHistory.Id,
                     VodId = VideoDetail.VodId,
                     Name = VideoName,
                     Episode = episodeSubject.Name,
-                    Url = episodeSubject.Url,
+                    Url = mediaUrl,
                     Source = SourceName,
-                    PlaybackPosition = viewHistory.PlaybackPosition,
-                    Duration = 0,
+                    Cover = cover,
+                    PlaybackPosition = isSameEpisode ? viewHistory.PlaybackPosition : 0,
+                    Duration = isSameEpisode ? viewHistory.Duration : 0,
                     TotalEpisodeCount = VideoDetail.Episodes.Count,
-                    IsLocal = false
+                    IsLocal = false,
+                    CreateTime = viewHistory.CreateTime
                 };
             }
             else
@@ -120,8 +166,9 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
                     VodId = VideoDetail.VodId,
                     Name = VideoName,
                     Episode = episodeSubject.Name,
-                    Url = episodeSubject.Url,
+                    Url = mediaUrl,
                     Source = SourceName,
+                    Cover = cover,
                     PlaybackPosition = 0,
                     Duration = 0,
                     TotalEpisodeCount = VideoDetail.Episodes.Count,
@@ -177,12 +224,14 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         {
             if (Episodes.Count > 1)
             {
-                await tvdownloadVm.AddMediaDownload(episode.Name, episode.Url, VideoName);
+                await tvdownloadVm.AddMediaDownload(episode.Name, episode.Url, VideoName, SourceName ?? string.Empty, Cover ?? VideoDetail.Cover);
             }
             else
             {
-                await tvdownloadVm.AddMediaDownload($"{VideoName}-{episode.Name}", episode.Url);
+                await tvdownloadVm.AddMediaDownload($"{VideoName}-{episode.Name}", episode.Url, source: SourceName ?? string.Empty, cover: Cover ?? VideoDetail.Cover);
             }
+
+            episode.IsDownloaded = true;
         }
 
         IsDownloadingSelected = false;
@@ -212,5 +261,7 @@ public partial class EpisodeSubjectItem : ObservableObject
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private string? _name;
     [ObservableProperty] private string? _url;
+    [ObservableProperty] private bool _isDownloaded;
+    [ObservableProperty] private string? _outputFilePath;
     [ObservableProperty] private bool _watched; //是否观看
 }

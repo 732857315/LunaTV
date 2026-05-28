@@ -95,6 +95,28 @@ public partial class MainViewModel : ViewModelBase
         AppConifg.SelectApis.AddRange(apiSources.Where(api => api.IsEnable && !api.IsAdult).Select(api => api.Source));
         AppConifg.SelectAdultApis.AddRange(apiSources.Where(api => api.IsEnable && api.IsAdult)
             .Select(api => api.Source));
+        AppConifg.UpdateSites(apiSources);
+
+        var playerConfigTable = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>();
+        var playerConfig = playerConfigTable.GetSingle(config => config.Id > 0);
+        if (playerConfig is null)
+        {
+            AppConifg.PlayerConfig = new PlayerConfig
+            {
+                AdFilteringEnabled = true,
+                DoubanApiEnabled = false,
+                HomeAutoLoadDoubanEnabled = false,
+                ForceApiNeedSpecialSource = false,
+                Timeout = 15000,
+                FilterAds = true,
+                AutoPlayNext = false
+            };
+            playerConfigTable.Insert(AppConifg.PlayerConfig);
+        }
+        else
+        {
+            AppConifg.PlayerConfig = playerConfig;
+        }
     }
 
     public ObservableCollection<TVMenuItem> Items { get; set; }
@@ -111,6 +133,8 @@ public partial class MainViewModel : ViewModelBase
         if (string.IsNullOrEmpty(content)) return;
         if (_viewDictionary.TryGetValue(content, out var control))
         {
+            if (control.DataContext is TVShowHistoryViewModel historyViewModel)
+                historyViewModel.RefreshHistoryItems();
             PageContent = control;
         }
         else

@@ -31,6 +31,13 @@ public class SpeedMenuItemViewModel
 
 public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 {
+    public static string BuildPlayerTitle(string? title, string? episode)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return episode ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(episode)) return title;
+        return string.Equals(title, episode, StringComparison.OrdinalIgnoreCase) ? title : $"{title} {episode}";
+    }
+
     private readonly LoadingWaitViewModel _loadingWaitViewModel = new();
 
     private bool _disposed;
@@ -233,6 +240,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     private void Stoped()
     {
         FlushPendingPosition();
+        SaveViewHistory();
 
         if (string.IsNullOrEmpty(MediaUrl) && !IsMediaLoaded)
         {
@@ -253,7 +261,6 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         IgnoreUnavailableProperty(() => Mpv.Pause.Set(false));
         IgnoreUnavailableProperty(() => Mpv!.Stop().Invoke());
         SpeedChange(1.0f);
-        SaveViewHistory();
         Stoped();
     }
 
@@ -390,7 +397,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             }
 
             MediaUrl = item.Url;
-            Title = $"{ViewHistory?.Name} {item.Name}";
+            Title = BuildPlayerTitle(ViewHistory?.Name, item.Name);
             Episodes.ToList().ForEach(episode => episode.Watched = episode.Name == item.Name);
             SaveViewHistory();
         });

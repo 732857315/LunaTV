@@ -91,6 +91,25 @@
                 Text="下载管理"
                 Theme="{DynamicResource TitleTextBlock}" />
 
+            <StackPanel
+                DockPanel.Dock="Right"
+                Orientation="Horizontal"
+                Spacing="4">
+                <TextBox
+                    Classes="ClearButton"
+                    MinWidth="180"
+                    PlaceholderText="筛选下载..."
+                    Text="{Binding DownloadFilterText}" />
+                <Button
+                    Command="{Binding ClearFailedTasksCommand}"
+                    Content="清空失败"
+                    Theme="{DynamicResource BorderlessButton}" />
+                <Button
+                    Command="{Binding ClearCompletedTasksCommand}"
+                    Content="清空已完成"
+                    Theme="{DynamicResource BorderlessButton}" />
+            </StackPanel>
+
             <TextBlock
                 DockPanel.Dock="Right"
                 HorizontalAlignment="Right"
@@ -112,7 +131,7 @@
             Grid.Row="2"
             HeadersVisibility="All"
             IsReadOnly="True"
-            ItemsSource="{Binding MediaDownloadViewModels}"
+            ItemsSource="{Binding FilteredDownloadViewModels}"
             Margin="8">
             <DataGrid.Styles>
                 <Style Selector="Label.statusClasses">
@@ -189,6 +208,13 @@
                                 Spacing="4">
                                 <Button
                                     Classes="TransparentButton"
+                                    Command="{Binding PlayCommand}"
+                                    Theme="{DynamicResource BorderlessButton}"
+                                    ToolTip.Tip="播放">
+                                    <PathIcon Data="{DynamicResource SemiIconPlay}" Theme="{DynamicResource InnerPathIcon}" />
+                                </Button>
+                                <Button
+                                    Classes="TransparentButton"
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="{Binding Url}">
                                     <PathIcon Data="{DynamicResource SemiIconLink}" Theme="{DynamicResource InnerPathIcon}" />
@@ -199,6 +225,14 @@
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="{Binding LocalPath}">
                                     <PathIcon Data="{DynamicResource SemiIconFolderOpen}" Theme="{DynamicResource InnerPathIcon}" />
+                                </Button>
+                                <Button
+                                    Classes="TransparentButton"
+                                    Command="{Binding $parent[DataGrid].((vm:TVDownloadViewModel)DataContext).DeleteDownloadTaskCommand}"
+                                    CommandParameter="{Binding}"
+                                    Theme="{DynamicResource BorderlessButton}"
+                                    ToolTip.Tip="删除任务">
+                                    <PathIcon Data="{DynamicResource SemiIconDelete}" Theme="{DynamicResource InnerPathIcon}" />
                                 </Button>
                             </StackPanel>
                         </DataTemplate>

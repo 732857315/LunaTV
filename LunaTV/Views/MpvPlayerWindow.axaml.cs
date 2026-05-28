@@ -138,7 +138,7 @@ public partial class MpvPlayerWindow : UrsaWindow
         _overlayTimer.Stop();
         _fullscreenStateGuardTimer.Stop();
         base.OnClosed(e);
-        (App.VisualRoot as MainWindow)?.Show();
+        if (!App.IsShuttingDown) (App.VisualRoot as MainWindow)?.Show();
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

@@ -74,22 +74,6 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     public TVShowHomeViewModel()
     {
-        var pcfg = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>().GetSingle(u => u.Id > 0);
-        AppConifg.PlayerConfig =
-            pcfg ??
-            new PlayerConfig
-            {
-                AdFilteringEnabled = true,
-                DoubanApiEnabled = false,
-                HomeAutoLoadDoubanEnabled = false,
-                ForceApiNeedSpecialSource = false,
-                Timeout = 15000,
-                FilterAds = true,
-                AutoPlayNext = false
-            };
-        if (pcfg == null)
-            App.Services.GetRequiredService<SugarRepository<PlayerConfig>>().Insert(AppConifg.PlayerConfig);
-
         DoubanTags = new ObservableCollection<string>();
         MovieCardItems = new ObservableCollection<MovieCardItem>();
         _ = SwitchMovieOrTv("电影");
@@ -240,13 +224,25 @@ public partial class TVShowHomeViewModel : ViewModelBase
     private void SaveMovieTags(List<string> tags)
     {
         AppConifg.PlayerConfig.DoubanMovieTags = JsonSerializer.Serialize(tags);
-        App.Services.GetRequiredService<SugarRepository<PlayerConfig>>().Update(AppConifg.PlayerConfig);
+        SavePlayerConfig();
     }
 
     private void SaveTvTags(List<string> tags)
     {
         AppConifg.PlayerConfig.DoubanTvTags = JsonSerializer.Serialize(tags);
-        App.Services.GetRequiredService<SugarRepository<PlayerConfig>>().Update(AppConifg.PlayerConfig);
+        SavePlayerConfig();
+    }
+
+    private static void SavePlayerConfig()
+    {
+        var playerConfigTable = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>();
+        if (AppConifg.PlayerConfig.Id > 0)
+        {
+            playerConfigTable.Update(AppConifg.PlayerConfig);
+            return;
+        }
+
+        AppConifg.PlayerConfig.Id = playerConfigTable.Context.Insertable(AppConifg.PlayerConfig).ExecuteReturnIdentity();
     }
 
     private async Task RefreshMovieCardsAsync()
@@ -719,6 +715,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
             if (showNotification)
                 App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，验证成功后窗口会自动隐藏。", NotificationType.Warning), NotificationType.Warning);
 
+            _doubanVerifyWindow.WaitForVerification();
             _doubanVerifyWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             _doubanVerifyWindow.Topmost = true;
             _doubanVerifyWindow.Show(owner);
@@ -734,6 +731,8 @@ public partial class TVShowHomeViewModel : ViewModelBase
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Topmost = true
         };
+        _doubanVerifyWindow.VerificationCompleted += RefreshMovieCardsAsync;
+        _doubanVerifyWindow.WaitForVerification();
         _doubanVerifyWindow.Show(owner);
         _doubanVerifyWindow.Activate();
     }
@@ -837,8 +836,22 @@ public partial class TVShowHomeViewModel : ViewModelBase
             win.Show();
             if (win.DataContext is MpvPlayerWindowModel videoModel)
             {
-                videoModel.MediaUrl = file[0].Path.LocalPath;
-                videoModel.Title = file[0].Path.LocalPath.Substring(file[0].Path.LocalPath.LastIndexOf('\\') + 1);
+                var localPath = file[0].Path.LocalPath;
+                var title = Path.GetFileName(localPath);
+                videoModel.MediaUrl = localPath;
+                videoModel.Title = title;
+                videoModel.ViewHistory = new ViewHistory
+                {
+                    VodId = localPath,
+                    Name = title,
+                    Episode = title,
+                    Url = localPath,
+                    Source = "本地",
+                    PlaybackPosition = 0,
+                    Duration = 0,
+                    TotalEpisodeCount = 1,
+                    IsLocal = true
+                };
             }
         }
     }

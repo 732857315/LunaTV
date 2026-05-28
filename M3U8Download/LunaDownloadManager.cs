@@ -817,18 +817,16 @@ internal class LunaDownloadManager
 
         var speedContainer = speedContainerDic[task.Id];
         ds.size = speedContainer.RDownloaded;
-        ds.totalSize = speedContainer.SingleSegment
-            ? speedContainer.ResponseLength ?? 0
-            : (long)(ds.size / (task.Value / task.MaxValue));
-        ds.sizeStr = $"{GlobalUtil.FormatFileSize(ds.size)}/{GlobalUtil.FormatFileSize(ds.totalSize)}";
+        ds.totalSize = speedContainer.SingleSegment ? speedContainer.ResponseLength ?? 0 : 0;
+        ds.sizeStr = ds.totalSize > 0
+            ? $"{GlobalUtil.FormatFileSize(ds.size)}/{GlobalUtil.FormatFileSize(ds.totalSize)}"
+            : $"已下载 {GlobalUtil.FormatFileSize(ds.size)}";
 
-        speedContainer.NowSpeed = speedContainer.Downloaded;
+        speedContainer.NowSpeed = speedContainer.ConsumeDownloaded();
         // 速度为0，计数增加
-        if (speedContainer.Downloaded <= 0)
+        if (speedContainer.NowSpeed <= 0)
             speedContainer.AddLowSpeedCount();
         else speedContainer.ResetLowSpeedCount();
-
-        speedContainer.Reset();
 
         ds.speed = GlobalUtil.FormatFileSize(speedContainer.NowSpeed) + "ps";
 

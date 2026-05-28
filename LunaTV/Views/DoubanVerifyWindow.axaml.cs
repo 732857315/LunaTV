@@ -13,6 +13,10 @@ public partial class DoubanVerifyWindow : Window
     private readonly SemaphoreSlim _apiFetchLock = new(1, 1);
     private TaskCompletionSource<string>? _apiFetchCompletion;
     private bool _forceClose;
+    private bool _waitingForVerification;
+    private bool _skipNextAutoHide;
+
+    public event Func<Task>? VerificationCompleted;
 
     public DoubanVerifyWindow()
     {
@@ -27,7 +31,11 @@ public partial class DoubanVerifyWindow : Window
         };
         Closed += (_, _) => Windows.Remove(this);
         DoubanWebView.NewWindowRequested += DoubanWebView_OnNewWindowRequested;
-        DoubanWebView.NavigationCompleted += DoubanWebView_OnNavigationCompleted;
+        DoubanWebView.NavigationCompleted += async (_, _) =>
+        {
+            await CompleteApiFetchAsync();
+            await AutoHideAfterVerificationAsync();
+        };
     }
 
     public DoubanVerifyWindow(Uri source) : this()
@@ -46,8 +54,19 @@ public partial class DoubanVerifyWindow : Window
         }
     }
 
+    public void WaitForVerification()
+    {
+        _waitingForVerification = true;
+        _skipNextAutoHide = true;
+        if (DoubanWebView.Source is { AbsolutePath: var path } && path.StartsWith("/j/", StringComparison.OrdinalIgnoreCase))
+        {
+            DoubanWebView.Source = new Uri("https://movie.douban.com/");
+        }
+    }
+
     public void HideAfterVerification()
     {
+        _waitingForVerification = false;
         Hide();
     }
 
@@ -73,11 +92,6 @@ public partial class DoubanVerifyWindow : Window
         }
     }
 
-    private async void DoubanWebView_OnNavigationCompleted(object? sender, EventArgs e)
-    {
-        await CompleteApiFetchAsync();
-    }
-
     private async Task CompleteApiFetchAsync()
     {
         var completion = _apiFetchCompletion;
@@ -96,6 +110,26 @@ public partial class DoubanVerifyWindow : Window
         {
             if (ReferenceEquals(_apiFetchCompletion, completion)) _apiFetchCompletion = null;
         }
+    }
+
+    private async Task AutoHideAfterVerificationAsync()
+    {
+        if (!_waitingForVerification || _apiFetchCompletion is not null) return;
+        if (_skipNextAutoHide)
+        {
+            _skipNextAutoHide = false;
+            return;
+        }
+
+        if (DoubanWebView.Source is not { } source) return;
+        if (!source.Host.EndsWith("douban.com", StringComparison.OrdinalIgnoreCase)) return;
+        if (source.AbsolutePath.Contains("accounts", StringComparison.OrdinalIgnoreCase)) return;
+        if (source.AbsolutePath.Contains("passport", StringComparison.OrdinalIgnoreCase)) return;
+        if (source.AbsolutePath.Contains("captcha", StringComparison.OrdinalIgnoreCase)) return;
+
+        _waitingForVerification = false;
+        Hide();
+        if (VerificationCompleted is not null) await VerificationCompleted.Invoke();
     }
 
     private void DoubanWebView_OnNewWindowRequested(object? sender, WebViewNewWindowRequestedEventArgs e)

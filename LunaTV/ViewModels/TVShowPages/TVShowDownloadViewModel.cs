@@ -140,6 +140,15 @@ public partial class TVShowDownloadViewModel : ViewModelBase
                 Url = url,
                 LocalPath = downloadPath,
                 IsDownloaded = true,
+                DownloadStatus = 2,
+                Progress = 100,
+                DownloadedBytes = totalBytesRead,
+                TotalBytes = totalBytes > 0 ? totalBytes : totalBytesRead,
+                SizeText = totalBytes > 0 ? $"{totalBytesRead}/{totalBytes}" : $"已下载 {totalBytesRead}",
+                SpeedText = "0 Bps",
+                RemainingTimeText = "--:--:--",
+                ErrorMessage = null,
+                OutputFilePath = downloadPath,
                 CreateTime = DateTime.Now,
                 UpdateTime = DateTime.Now
             };
@@ -244,6 +253,12 @@ public partial class TVShowDownloadViewModel : ViewModelBase
                     Url = url,
                     LocalPath = Path.Combine(downloadDir, $"{fileName}.mp4"), // 默认输出格式
                     IsDownloaded = true,
+                    DownloadStatus = 2,
+                    Progress = 100,
+                    SpeedText = "0 Bps",
+                    RemainingTimeText = "--:--:--",
+                    ErrorMessage = null,
+                    OutputFilePath = Path.Combine(downloadDir, $"{fileName}.mp4"),
                     CreateTime = DateTime.Now,
                     UpdateTime = DateTime.Now
                 };
@@ -294,6 +309,10 @@ public partial class TVShowDownloadViewModel : ViewModelBase
             Name = DownloadName,
             Url = DownloadUrl,
             IsDownloaded = false,
+            DownloadStatus = 0,
+            Progress = 0,
+            SpeedText = "0 Bps",
+            RemainingTimeText = "--:--:--",
             CreateTime = DateTime.Now,
             UpdateTime = DateTime.Now
         };

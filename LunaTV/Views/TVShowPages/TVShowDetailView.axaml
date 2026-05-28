@@ -154,10 +154,17 @@
                                         <Setter Property="RenderTransform" Value="scale(1.05,1.05)" />
                                     </Style>
                                 </Button.Styles>
-                                <TextBlock Classes.Warning="{Binding Watched}" Text="{Binding Name}">
+                                <TextBlock
+                                    Classes.Downloaded="{Binding IsDownloaded}"
+                                    Classes.Warning="{Binding Watched}"
+                                    Text="{Binding Name}">
                                     <TextBlock.Styles>
                                         <Style Selector="TextBlock.Warning">
                                             <Setter Property="ToolTip.Tip" Value="已经看过" />
+                                        </Style>
+                                        <Style Selector="TextBlock.Downloaded">
+                                            <Setter Property="Foreground" Value="{DynamicResource SemiGreen6}" />
+                                            <Setter Property="ToolTip.Tip" Value="已下载" />
                                         </Style>
                                     </TextBlock.Styles>
                                 </TextBlock>

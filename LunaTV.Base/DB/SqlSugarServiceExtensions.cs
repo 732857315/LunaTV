@@ -86,8 +86,51 @@ public static class SqlSugarServiceExtensions
             });
         }
 
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "DownloadStatus"))
+            AddMediaDownloadColumn("DownloadStatus", "int", false, "0");
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "Progress"))
+            AddMediaDownloadColumn("Progress", "real", false, "0");
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "DownloadedBytes"))
+            AddMediaDownloadColumn("DownloadedBytes", "bigint", false, "0");
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "TotalBytes"))
+            AddMediaDownloadColumn("TotalBytes", "bigint", false, "0");
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "SizeText"))
+            AddMediaDownloadColumn("SizeText", "varchar(2000)", true);
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "SpeedText"))
+            AddMediaDownloadColumn("SpeedText", "varchar(2000)", true);
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "RemainingTimeText"))
+            AddMediaDownloadColumn("RemainingTimeText", "varchar(2000)", true);
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "ErrorMessage"))
+            AddMediaDownloadColumn("ErrorMessage", "varchar(2000)", true);
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "OutputFilePath"))
+            AddMediaDownloadColumn("OutputFilePath", "varchar(2000)", true);
+        if (!db.DbMaintenance.IsAnyColumn("media_download", "Cover"))
+            AddMediaDownloadColumn("Cover", "varchar(2000)", true);
+        if (!db.DbMaintenance.IsAnyColumn("view_history", "Cover"))
+        {
+            db.DbMaintenance.AddColumn("view_history", new DbColumnInfo
+            {
+                DbColumnName = "Cover",
+                TableName = "view_history",
+                DataType = "varchar(2000)",
+                IsNullable = true
+            });
+        }
+
         services.AddSingleton<ISqlSugarClient>(db);
         return services;
+
+        void AddMediaDownloadColumn(string name, string dataType, bool isNullable, string? defaultValue = null)
+        {
+            db.DbMaintenance.AddColumn("media_download", new DbColumnInfo
+            {
+                DbColumnName = name,
+                TableName = "media_download",
+                DataType = dataType,
+                IsNullable = isNullable,
+                DefaultValue = defaultValue
+            });
+        }
     }
 
     public static void AddSugarRepository(this IServiceCollection services)

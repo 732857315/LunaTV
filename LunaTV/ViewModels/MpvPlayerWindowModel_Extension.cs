@@ -61,7 +61,7 @@ public partial class MpvPlayerWindowModel
     {
         if (Duration > TimeSpan.FromSeconds(1) && ViewHistory is not null)
         {
-            ViewHistory.PlaybackPosition = (int)Position.TotalSeconds;
+            ViewHistory.PlaybackPosition = (int)_lastPositionValue;
             ViewHistory.Duration = (int)Duration.TotalSeconds;
             ViewHistory.UpdateTime = DateTime.Now;
             if (ViewHistory.Id == 0)
@@ -114,7 +114,7 @@ public partial class MpvPlayerWindowModel
                         ViewHistory.Url = Episodes[Episodes.IndexOf(episode) + 1].Url;
 
                         MediaUrl = Episodes[Episodes.IndexOf(episode) + 1].Url;
-                        Title = $"{ViewHistory?.Name} {Episodes[Episodes.IndexOf(episode) + 1].Name}";
+                        Title = BuildPlayerTitle(ViewHistory?.Name, Episodes[Episodes.IndexOf(episode) + 1].Name);
                         Episodes.ToList().ForEach(episode =>
                             episode.Watched = episode.Name == Episodes[Episodes.IndexOf(episode) + 1].Name);
 
