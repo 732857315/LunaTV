@@ -356,6 +356,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
     private void RemoveSearchResult(SearchResult searchResult)
     {
         _allSearchResults.Remove(searchResult);
+        SearchResults.Remove(searchResult);
         var key = BuildSearchResultKey(searchResult);
         _searchResultKeys.Remove(key);
         _searchDetails.TryRemove(key, out _);
@@ -364,7 +365,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
         TotalVideos = _allSearchResults.Count;
         SearchCountText = BuildSearchCountText(IsSearching);
         NormalizeManualPageSize();
-        RefreshCurrentPage();
+        if (!IsSearching) RefreshCurrentPage();
     }
 
     [RelayCommand]

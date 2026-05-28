@@ -719,7 +719,6 @@ public partial class TVShowHomeViewModel : ViewModelBase
             if (showNotification)
                 App.Notification?.Show(new Notification("豆瓣需要验证", "请在弹出的豆瓣窗口中手动完成验证，验证成功后窗口会自动隐藏。", NotificationType.Warning), NotificationType.Warning);
 
-            _doubanVerifyWindow.WaitForVerification();
             _doubanVerifyWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             _doubanVerifyWindow.Topmost = true;
             _doubanVerifyWindow.Show(owner);
@@ -735,7 +734,6 @@ public partial class TVShowHomeViewModel : ViewModelBase
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Topmost = true
         };
-        _doubanVerifyWindow.WaitForVerification();
         _doubanVerifyWindow.Show(owner);
         _doubanVerifyWindow.Activate();
     }

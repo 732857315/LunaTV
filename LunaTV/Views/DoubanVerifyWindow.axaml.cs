@@ -13,7 +13,6 @@ public partial class DoubanVerifyWindow : Window
     private readonly SemaphoreSlim _apiFetchLock = new(1, 1);
     private TaskCompletionSource<string>? _apiFetchCompletion;
     private bool _forceClose;
-    private bool _waitingForVerification;
 
     public DoubanVerifyWindow()
     {
@@ -28,7 +27,7 @@ public partial class DoubanVerifyWindow : Window
         };
         Closed += (_, _) => Windows.Remove(this);
         DoubanWebView.NewWindowRequested += DoubanWebView_OnNewWindowRequested;
-        DoubanWebView.NavigationCompleted += async (_, _) => await CompleteApiFetchAsync();
+        DoubanWebView.NavigationCompleted += DoubanWebView_OnNavigationCompleted;
     }
 
     public DoubanVerifyWindow(Uri source) : this()
@@ -47,14 +46,8 @@ public partial class DoubanVerifyWindow : Window
         }
     }
 
-    public void WaitForVerification()
-    {
-        _waitingForVerification = true;
-    }
-
     public void HideAfterVerification()
     {
-        _waitingForVerification = false;
         Hide();
     }
 
@@ -78,6 +71,11 @@ public partial class DoubanVerifyWindow : Window
 
             _apiFetchLock.Release();
         }
+    }
+
+    private async void DoubanWebView_OnNavigationCompleted(object? sender, EventArgs e)
+    {
+        await CompleteApiFetchAsync();
     }
 
     private async Task CompleteApiFetchAsync()
