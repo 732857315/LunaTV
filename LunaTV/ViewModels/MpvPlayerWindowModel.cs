@@ -237,10 +237,20 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         }
     }
 
-    private void Stoped()
+    private void SaveCurrentViewHistory()
     {
+        if (IsMediaLoaded && Mpv is not null)
+        {
+            IgnoreUnavailableProperty(() => _lastPositionValue = Mpv.TimePos.Get() ?? _lastPositionValue);
+        }
+
         FlushPendingPosition();
         SaveViewHistory();
+    }
+
+    private void Stoped(bool saveHistory = true)
+    {
+        if (saveHistory) SaveCurrentViewHistory();
 
         if (string.IsNullOrEmpty(MediaUrl) && !IsMediaLoaded)
         {
@@ -258,10 +268,11 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
     public void Stop()
     {
+        SaveCurrentViewHistory();
         IgnoreUnavailableProperty(() => Mpv.Pause.Set(false));
         IgnoreUnavailableProperty(() => Mpv!.Stop().Invoke());
         SpeedChange(1.0f);
-        Stoped();
+        Stoped(false);
     }
 
     public void Seek(int seconds)

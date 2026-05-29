@@ -182,9 +182,9 @@ public partial class TVShowHistoryViewModel : ViewModelBase
         win.Show();
         if (win.DataContext is MpvPlayerWindowModel videoModel)
         {
+            videoModel.ViewHistory = historyItem;
             videoModel.MediaUrl = historyItem.Url;
             videoModel.Title = MpvPlayerWindowModel.BuildPlayerTitle(historyItem.Name, historyItem.Episode);
-            videoModel.ViewHistory = historyItem;
             if (historyItem.IsLocal || historyItem.Source is "本地" or "下载")
             {
                 videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>
