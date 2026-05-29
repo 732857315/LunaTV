@@ -422,12 +422,14 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             IsMediaLoaded = true;
             if (Duration > TimeSpan.FromSeconds(1))
             {
+                var resumePosition = Math.Max(0, Math.Min(ViewHistory?.PlaybackPosition ?? 0, (int)Duration.TotalSeconds));
                 lock (Mpv!)
                 {
-                    IgnoreUnavailableProperty(() => Mpv.TimePos.Set(ViewHistory?.PlaybackPosition ?? 0));
+                    IgnoreUnavailableProperty(() => Mpv.TimePos.Set(resumePosition));
                 }
 
-                SaveViewHistory();
+                _lastPositionValue = resumePosition;
+                SetPositionNoSeek(TimeSpan.FromSeconds(resumePosition));
             }
             else
             {
