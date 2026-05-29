@@ -11,27 +11,6 @@ public partial class MainWindow : UrsaWindow
         InitializeComponent();
 
         ApplyPlatformSpecificMargin();
-
-        // Test with OpenGL
-        // var player = new LibMpvDynamicPlayer();
-        // if (player.CanLoad())
-        // {
-        //     var view = new LibMpvDynamicOpenGlControl(player);
-        //     ContentControl.Content = new VideoPlayerControl(player)
-        //     {
-        //         PlayerContent = view,
-        //         StopIsVisible = true,
-        //         FullScreenIsVisible = true,
-        //         VerticalAlignment = VerticalAlignment.Stretch,
-        //         HorizontalAlignment = HorizontalAlignment.Stretch
-        //     };
-        // }
-        //
-        // Dispatcher.InvokeAsync(async () =>
-        // { 
-        //     await player.LoadFile("/Users/x/Downloads/图片文字去除.mp4");
-        //     player.Play();
-        // });
     }
 
     private void ApplyPlatformSpecificMargin()
