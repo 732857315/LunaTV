@@ -147,7 +147,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: "v${{ steps.get_version.outputs.version }}"
           files: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
-          generate_release_notes: false
+          generate_release_notes: true
+          body: ${{ needs.changelog.release_body.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
