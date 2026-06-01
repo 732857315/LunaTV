@@ -95,7 +95,7 @@ jobs:
     needs: changelog
     strategy:
       matrix:
-        cpu: [ x64 ]
+        cpu: [ x64, arm64 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -150,7 +150,6 @@ jobs:
           tag_name: ${{ steps.get_version.outputs.version }}
           name: "v${{ steps.get_version.outputs.version }}"
           files: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
-          generate_release_notes: true
-          body: ${{ needs.changelog.release_body.outputs.body }}
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
