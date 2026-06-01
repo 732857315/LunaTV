@@ -18,7 +18,8 @@ jobs:
   changelog:
     name: Generate changelog
     runs-on: ubuntu-latest
-
+    outputs:
+      release_body: ${{ steps.changelog_section.outputs.content }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -29,7 +30,7 @@ jobs:
           input: ./CHANGELOG.md
           output: ./changelog-section.md
       - name: Print the changelog
-        run: cat "./changelog-section.md"
+        run: cat ${{ steps.changelog_section.outputs.content }}
 
   build-windows:
     runs-on: windows-latest
@@ -74,14 +75,6 @@ jobs:
           Remove-Item './publish/de','./publish/es','./publish/fr','./publish/it','./publish/ja','./publish/ko','./publish/pt-BR','./publish/ru','./publish/zh-Hans','./publish/zh-Hant' -Recurse -Force
           Compress-Archive -Path ./publish/* -DestinationPath "./$artifactName.zip"
 
-      - name: Release body from changelog
-        id: release_body
-        run: |
-          echo 'body<<EOF' >> "$GITHUB_OUTPUT"
-          cat changelog-section.md >> "$GITHUB_OUTPUT"
-          echo '' >> "$GITHUB_OUTPUT"
-          echo 'EOF' >> "$GITHUB_OUTPUT"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -89,7 +82,7 @@ jobs:
           name: "v${{ steps.get_version.outputs.version }}"
           files: LunaTV-Windows-x64-${{ steps.get_version.outputs.version }}.zip
           generate_release_notes: true
-          body: ${{ steps.release_body.outputs.body }}
+          body: ${{ steps.changelog.outputs.release_body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
