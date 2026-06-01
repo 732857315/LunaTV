@@ -29,8 +29,10 @@ jobs:
         with:
           input: ./CHANGELOG.md
           output: ./changelog-section.md
+        env:
+          OUTPUT: changelog-section.md
       - name: Print the changelog
-        run: cat ${{ steps.changelog_section.outputs.content }}
+        run: cat ${{ steps.changelog_section.outputs.changelog-section }}
 
   build-windows:
     runs-on: windows-latest
