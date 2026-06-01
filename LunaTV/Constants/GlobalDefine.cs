@@ -13,11 +13,11 @@ public sealed class GlobalDefine
 
     static GlobalDefine()
     {
-        string fileName = OperatingSystem.IsWindows() ? "LunaTV.exe" : "LunaTV";
-        FileVersionInfo app = FileVersionInfo.GetVersionInfo(Path.Combine(RootPath, fileName));
+        var fileName = OperatingSystem.IsWindows() ? "LunaTV.exe" : "LunaTV";
+        var app = FileVersionInfo.GetVersionInfo(Path.Combine(RootPath, fileName));
 
-        string basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        string appPath = Path.Combine(basePath, "LunaTV");
+        var basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var appPath = Path.Combine(basePath, "LunaTV");
         if (!Directory.Exists(appPath))
         {
             Directory.CreateDirectory(appPath);
@@ -49,7 +49,7 @@ public sealed class GlobalDefine
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LunaTV",
             "lunatv-app.json");
 
-    public static string FFmpegPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
+    public static string? FFmpegPath { get; set; }
 
     public static string WaveformsFolder => Path.Combine(DataPath, "Waveforms");
     public static int WaveformMinimumSampleRate { get; set; } = 126;
@@ -66,6 +66,7 @@ public sealed class GlobalDefine
             {
                 s_platform = GetPlatform();
             }
+
             return s_platform == PlatformWindows;
         }
     }
@@ -78,6 +79,7 @@ public sealed class GlobalDefine
             {
                 s_platform = GetPlatform();
             }
+
             return s_platform == PlatformLinux;
         }
     }
@@ -90,6 +92,7 @@ public sealed class GlobalDefine
             {
                 s_platform = GetPlatform();
             }
+
             return s_platform == PlatformMac;
         }
     }
@@ -98,7 +101,8 @@ public sealed class GlobalDefine
     {
         // Current versions of Mono report MacOSX platform as Unix
         return Environment.OSVersion.Platform == PlatformID.MacOSX ||
-               Environment.OSVersion.Platform == PlatformID.Unix && Directory.Exists("/Applications") && Directory.Exists("/System") && Directory.Exists("/Users")
+               (Environment.OSVersion.Platform == PlatformID.Unix && Directory.Exists("/Applications") &&
+                Directory.Exists("/System") && Directory.Exists("/Users"))
             ? PlatformMac
             : Environment.OSVersion.Platform == PlatformID.Unix
                 ? PlatformLinux

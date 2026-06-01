@@ -8,9 +8,10 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-<!--        <PublishAot>true</PublishAot>-->
+        <!--        <PublishAot>true</PublishAot>-->
         <Version>0.9.5</Version>
         <AssemblyVersion>0.9.5.2</AssemblyVersion>
+        <ApplicationIcon>Assets/logo-tv.ico</ApplicationIcon>
     </PropertyGroup>
 
     <ItemGroup>

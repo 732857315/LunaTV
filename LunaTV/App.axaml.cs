@@ -1,3 +1,6 @@
+using System;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -6,10 +9,9 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using LunaTV.Constants;
 using LunaTV.Views;
-using System;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+using N_m3u8DL_RE.Common.Util;
 using Ursa.Controls;
 
 namespace LunaTV;
@@ -41,6 +43,7 @@ public class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            GlobalDefine.FFmpegPath = GlobalUtil.FindExecutable("ffmpeg");
             var window = ServiceLocator.GetRequiredService<MainWindow>();
             desktop.MainWindow = window;
             VisualRoot = window;
