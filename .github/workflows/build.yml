@@ -33,7 +33,7 @@ jobs:
         run: |
           {
             echo 'body<<EOF'
-            cat release_notes.md
+            cat changelog-section.md
             echo ''
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
