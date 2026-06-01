@@ -78,7 +78,7 @@ jobs:
         with:
           tag_name: ${{ steps.get_version.outputs.version }}
           name: "v${{ steps.get_version.outputs.version }}"
-          files: LunaTV-Windows-x64-${{ steps.get_version.outputs.version }}.zip
+          files: LunaTV-${{ steps.get_version.outputs.version }}-Windows-x64.zip
           generate_release_notes: true
           body_path: ./changelog-section.md
         env:
