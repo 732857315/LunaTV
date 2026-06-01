@@ -128,7 +128,7 @@ jobs:
         run: |
           chmod +x package.sh
           ./package.sh ${{ matrix.cpu }}
-        working-directory: LunaTV/script/macos
+        working-directory: ./script/macos
       - name: Create DMG
         run: |
           create-dmg \
