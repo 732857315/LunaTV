@@ -22,21 +22,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
       - name: Read the changelog
         uses: ForNeVeR/ChangelogAutomation.action@v2
         with:
           input: ./CHANGELOG.md
           output: ./changelog-section.md
-      - name: Release body from changelog
-        id: release_body
-        run: |
-          {
-            echo 'body<<EOF'
-            cat changelog-section.md
-            echo ''
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
+      - name: Print the changelog
+        run: cat "${{ steps.git-cliff.outputs.changelog }}"
 
   build-windows:
     runs-on: windows-latest
@@ -77,7 +69,17 @@ jobs:
           $artifactName = "LunaTV-Windows-x64-${{ steps.get_version.outputs.version }}"
           Expand-Archive -Path "./publish/libmpv-2.zip" -DestinationPath "./publish"
           Remove-Item -Path "./publish/libmpv-2.zip"
+          Get-ChildItem -Path . -Filter './publish/*.pdb' | Remove-Item
+          Remove-Item './publish/de','./publish/es','./publish/fr','./publish/it','./publish/ja','./publish/ko','./publish/pt-BR','./publish/ru','./publish/zh-Hans','./publish/zh-Hant' -Recurse -Force
           Compress-Archive -Path ./publish/* -DestinationPath "./$artifactName.zip"
+
+      - name: Release body from changelog
+        id: release_body
+        run: |
+          echo 'body<<EOF' >> "$GITHUB_OUTPUT"
+          cat changelog-section.md >> "$GITHUB_OUTPUT"
+          echo '' >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -86,7 +88,7 @@ jobs:
           name: "v${{ steps.get_version.outputs.version }}"
           files: LunaTV-Windows-x64-${{ steps.get_version.outputs.version }}.zip
           generate_release_notes: true
-          body: ${{ needs.changelog.release_body.outputs.body }}
+          body: ${{ steps.release_body.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
