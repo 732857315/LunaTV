@@ -10,7 +10,7 @@
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 <!--        <PublishAot>true</PublishAot>-->
         <Version>0.9.5</Version>
-        <AssemblyVersion>0.9.5.1</AssemblyVersion>
+        <AssemblyVersion>0.9.5.2</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>
