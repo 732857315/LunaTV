@@ -50,9 +50,14 @@ jobs:
 
       - name: Read Version from LunaTV/LunaTV.csproj
         id: get_version
+        shell: pwsh
         run: |
-          CSPROJ_VERSION=$(grep -oP '(?<=<AssemblyVersion>)[^<]+' LunaTV/LunaTV.csproj | head -n 1)
-          echo "version=$CSPROJ_VERSION" >> $GITHUB_OUTPUT
+          $csprojPath = "LunaTV/LunaTV.csproj"
+          [xml]$xml = Get-Content $csprojPath
+          $version = $xml.Project.PropertyGroup.AssemblyVersion
+          if (-not $version) { $version = "0.0.0.0" }
+          Write-Host "提取到的版本号: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Publish Desktop App (win-x64)
         shell: pwsh
