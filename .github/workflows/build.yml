@@ -99,6 +99,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'  # 'recursive' 会拉取主仓库以及所有嵌套子模块
       - name: Install Tool Via HomeBrew
         run: |
           export HOMEBREW_NO_AUTO_UPDATE=true
