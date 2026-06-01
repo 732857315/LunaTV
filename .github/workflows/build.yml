@@ -67,6 +67,7 @@ jobs:
           dotnet publish LunaTV/LunaTV.csproj `
             -c Release `
             -r win-x64 `
+            -p:DebugType=None -p:DebugSymbols=false `
             --self-contained true `
             -o ./publish
 
@@ -78,10 +79,73 @@ jobs:
           Remove-Item -Path "./publish/libmpv-2.zip"
           Compress-Archive -Path ./publish/* -DestinationPath "./$artifactName.zip"
 
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: "v${{ steps.get_version.outputs.version }}"
+          files: LunaTV-Windows-x64-${{ steps.get_version.outputs.version }}.zip
+          generate_release_notes: true
+          body: ${{ steps.release_body.outputs.body }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    needs: changelog
+    strategy:
+      matrix:
+        cpu: [ x64 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Tool Via HomeBrew
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=true
+          export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=true
+          brew install create-dmg tree
+      - name: Install .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Read Version from LunaTV/LunaTV.csproj
+        id: get_version
+        shell: pwsh
+        run: |
+          $csprojPath = "LunaTV/LunaTV.csproj"
+          [xml]$xml = Get-Content $csprojPath
+          $version = $xml.Project.PropertyGroup.AssemblyVersion
+          if (-not $version) { $version = "0.0.0.0" }
+          Write-Host "提取到的版本号: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Build ${{ matrix.cpu }}
+        run: |
+          dotnet restore
+          dotnet publish LunaTV/LunaTV.csproj --self-contained -r osx-${{ matrix.cpu }} -c Release -p:DebugType=None -p:DebugSymbols=false
+      - name: Package app
+        run: |
+          chmod +x package.sh
+          ./package.sh ${{ matrix.cpu }}
+        working-directory: ./script/macos
+      - name: Create DMG
+        run: |
+          create-dmg \
+          --hdiutil-quiet \
+          --icon LunaTV.app 165 175 \
+          --icon-size 120 \
+          --app-drop-link 495 175 \
+          --window-size 660 400 \
+          LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg LunaTV.app
+        working-directory: ./script/macos
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
+          path: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
       - name: Release
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: $artifactName.zip
-          body: ${{ needs.changelog.steps.release_body.outputs.body }}
+          artifacts: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
+          body: ${{ needs.changelog.outputs.release_body }}
     
