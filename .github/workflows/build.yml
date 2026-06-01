@@ -144,10 +144,10 @@ jobs:
         with:
           name: LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
           path: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
-      - name: Release
-        uses: ncipollo/release-action@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
         with:
-          allowUpdates: true
-          artifacts: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
-          body: ${{ needs.changelog.release_body.outputs.body }}
-    
+          files: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
