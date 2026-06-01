@@ -86,7 +86,7 @@ jobs:
           name: "v${{ steps.get_version.outputs.version }}"
           files: LunaTV-Windows-x64-${{ steps.get_version.outputs.version }}.zip
           generate_release_notes: true
-          body: ${{ steps.release_body.outputs.body }}
+          body: ${{ needs.changelog.release_body.outputs.body }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -149,5 +149,5 @@ jobs:
         with:
           allowUpdates: true
           artifacts: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
-          body: ${{ needs.changelog.outputs.release_body }}
+          body: ${{ needs.changelog.release_body.outputs.body }}
     
