@@ -43,6 +43,8 @@ jobs:
     needs: changelog
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'  # 'recursive' 会拉取主仓库以及所有嵌套子模块
 
       - uses: actions/setup-dotnet@v5
         with:
