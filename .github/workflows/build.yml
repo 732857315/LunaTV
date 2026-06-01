@@ -38,7 +38,7 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
-  build-windows:
+  # build-windows:
     runs-on: windows-latest
     needs: changelog
     steps:
