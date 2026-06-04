@@ -59,8 +59,10 @@ public partial class MpvPlayerWindowModel
 
     private void SaveViewHistory()
     {
+        System.Diagnostics.Trace.WriteLine($"[HIST] SaveViewHistory ENTER Duration={Duration.TotalSeconds} _lastPositionValue={_lastPositionValue} ViewHistory?.Id={ViewHistory?.Id} ViewHistory==null?{ViewHistory is null}");
         if (Duration > TimeSpan.FromSeconds(1) && ViewHistory is not null)
         {
+            System.Diagnostics.Trace.WriteLine($"[HIST] SaveViewHistory WRITE PlaybackPosition={(int)_lastPositionValue} Id={ViewHistory.Id} (Insert? {ViewHistory.Id==0})");
             ViewHistory.PlaybackPosition = (int)_lastPositionValue;
             ViewHistory.Duration = (int)Duration.TotalSeconds;
             ViewHistory.UpdateTime = DateTime.Now;
@@ -72,6 +74,10 @@ public partial class MpvPlayerWindowModel
             {
                 _viewHistoryTable.Update(ViewHistory);
             }
+        }
+        else
+        {
+            System.Diagnostics.Trace.WriteLine("[HIST] SaveViewHistory SKIPPED guard failed");
         }
     }
 

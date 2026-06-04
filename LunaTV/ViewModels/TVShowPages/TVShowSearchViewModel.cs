@@ -34,6 +34,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
     private readonly ConcurrentDictionary<string, byte> _checkedSearchDetails = new();
     private readonly ConcurrentDictionary<string, byte> _searchDetailChecksInProgress = new();
     private readonly ConcurrentDictionary<string, byte> _failedSearchSources = new();
+    private readonly ConcurrentDictionary<string, byte> _skippedDeadSources = new();
     private int _autoPageSize = 16;
     private CancellationTokenSource? _searchCancellationTokenSource;
     private List<string> _searchSources = [];
@@ -44,6 +45,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
     private int _nextSourceIndex;
     private int _nextPage = 1;
     private readonly List<Task> _pendingDetailTasks = new();
+
 
     private readonly MovieTvService _apiService;
     private readonly SugarRepository<SearchHistory> _searchHistoryTable;
@@ -181,6 +183,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
         _nextSourceIndex = 0;
         _nextPage = 1;
         _failedSearchSources.Clear();
+        _skippedDeadSources.Clear();
         _searchResultKeys.Clear();
         _searchDetails.Clear();
         _checkedSearchDetails.Clear();
@@ -227,6 +230,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
     {
         if (IsSearching || !IsSearchPaused || string.IsNullOrWhiteSpace(_currentSearchName)) return;
         _failedSearchSources.Clear();
+        _skippedDeadSources.Clear();
         await RunSearchAsync();
     }
 
@@ -250,30 +254,45 @@ public partial class TVShowSearchViewModel : ViewModelBase
             await Task.WhenAll(sourceTasks);
             await SearchLocalAsync(_currentSearchName, token);
 
-            IsSearchCompleted = true;
-            SearchCountText = BuildSearchCountText(false);
+            if (ReferenceEquals(_searchCancellationTokenSource, cts))
+            {
+                IsSearchCompleted = true;
+                SearchCountText = BuildSearchCountText(false);
+            }
         }
         catch (OperationCanceledException)
         {
-            IsSearchPaused = _stopRequestedByUser;
-            IsSearchCompleted = false;
-            var stoppedText = $"已停止，共 {_allSearchResults.Count} 个结果";
-            SearchCountText = _failedSearchSources.Count == 0
-                ? stoppedText
-                : $"{stoppedText}，{_failedSearchSources.Count} 个源失败";
+            if (ReferenceEquals(_searchCancellationTokenSource, cts))
+            {
+                IsSearchPaused = _stopRequestedByUser;
+                IsSearchCompleted = false;
+                var stoppedText = $"已停止，共 {_allSearchResults.Count} 个结果";
+                var failedCount = _failedSearchSources.Count;
+                var skippedCount = _skippedDeadSources.Count;
+                if (failedCount > 0 && skippedCount > 0)
+                    SearchCountText = $"{stoppedText}，{failedCount} 个源失败，{skippedCount} 个源暂时不可用";
+                else if (failedCount > 0)
+                    SearchCountText = $"{stoppedText}，{failedCount} 个源失败";
+                else if (skippedCount > 0)
+                    SearchCountText = $"{stoppedText}，{skippedCount} 个源暂时不可用";
+                else
+                    SearchCountText = stoppedText;
+            }
         }
         finally
         {
-            _stopRequestedByUser = false;
             cts.Dispose();
             if (ReferenceEquals(_searchCancellationTokenSource, cts))
-                _searchCancellationTokenSource = null;
-            IsSearching = false;
-            CanSearch = true;
-
-            lock (_pendingDetailTasks)
             {
-                _pendingDetailTasks.Clear();
+                _stopRequestedByUser = false;
+                _searchCancellationTokenSource = null;
+                IsSearching = false;
+                CanSearch = true;
+
+                lock (_pendingDetailTasks)
+                {
+                    _pendingDetailTasks.Clear();
+                }
             }
         }
     }
@@ -343,7 +362,17 @@ public partial class TVShowSearchViewModel : ViewModelBase
             while (_allSearchResults.Count < AppConifg.SearchMaxVideos)
             {
                 token.ThrowIfCancellationRequested();
+
+                if (MovieTvService.IsHostDead(source))
+                {
+                    _skippedDeadSources.TryAdd(source, 0);
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                        SearchCountText = BuildSearchCountText(true));
+                    return;
+                }
+
                 var (results, pageCount) = await _apiService.SearchPage(source, _currentSearchName!, page, _currentSearchIsAdult, token);
+
                 await AppendSearchResultsAsync(results, token);
                 if (results.Count == 0 && pageCount == 0)
                 {
@@ -444,6 +473,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
         try
         {
             var detail = await _apiService.SearchDetail(result.Source, result.Id, _currentSearchIsAdult, cancellationToken);
+
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 _checkedSearchDetails.TryAdd(key, 0);
@@ -475,9 +505,16 @@ public partial class TVShowSearchViewModel : ViewModelBase
             ? $"搜索中，共 {_allSearchResults.Count} 个结果"
             : $"共 {_allSearchResults.Count} 个结果";
 
-        return _failedSearchSources.Count == 0
-            ? text
-            : $"{text}，{_failedSearchSources.Count} 个源失败";
+        var failedCount = _failedSearchSources.Count;
+        var skippedCount = _skippedDeadSources.Count;
+
+        if (failedCount > 0 && skippedCount > 0)
+            return $"{text}，{failedCount} 个源失败，{skippedCount} 个源暂时不可用";
+        if (failedCount > 0)
+            return $"{text}，{failedCount} 个源失败";
+        if (skippedCount > 0)
+            return $"{text}，{skippedCount} 个源暂时不可用";
+        return text;
     }
 
     private static string BuildSearchResultKey(SearchResult result)
@@ -539,9 +576,10 @@ public partial class TVShowSearchViewModel : ViewModelBase
 
         try
         {
+            using var detailCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var videos = isCached
                 ? cachedDetail
-                : await _apiService.SearchDetail(searchResult.Source, searchResult.Id, IsAdultMode);
+                : await _apiService.SearchDetail(searchResult.Source, searchResult.Id, IsAdultMode, detailCts.Token);
 
             if (videos?.Episodes is not { Count: > 0 })
             {
@@ -578,6 +616,13 @@ public partial class TVShowSearchViewModel : ViewModelBase
             await vm.RefreshUiAsync();
 
             await Dialog.ShowModal<TVShowDetailView, TVShowDetailViewModel>(vm, options: options);
+        }
+        catch (OperationCanceledException)
+        {
+            App.Notification?.Show(
+                new Notification("详情加载超时", $"{searchResult.Name} 详情加载超时，请稍后重试。", NotificationType.Warning),
+                NotificationType.Warning,
+                showClose: true);
         }
         finally
         {

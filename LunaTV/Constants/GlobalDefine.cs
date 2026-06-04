@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
+using LunaTV.Models;
 
 namespace LunaTV.Constants;
 
@@ -11,17 +12,19 @@ public sealed class GlobalDefine
     private const int PlatformMac = 3;
     private static int s_platform;
 
+    private static string? s_dataPath;
+    private static string? s_downloadPath;
+    private static string? s_screenshotPath;
+    private static string? s_tempPath;
+    private static string? s_logsPath;
+    private static string? s_waveformsPath;
+    private static string? s_spectrogramsPath;
+
     static GlobalDefine()
     {
         string fileName = OperatingSystem.IsWindows() ? "LunaTV.exe" : "LunaTV";
         FileVersionInfo app = FileVersionInfo.GetVersionInfo(Path.Combine(RootPath, fileName));
-
-        string basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        string appPath = Path.Combine(basePath, "LunaTV");
-        if (!Directory.Exists(appPath))
-        {
-            Directory.CreateDirectory(appPath);
-        }
+        EnsureDirectory(BootstrapDataPath);
     }
 
     /// <summary>
@@ -34,29 +37,119 @@ public sealed class GlobalDefine
     /// </summary>
     public static string RootPath => AppDomain.CurrentDomain.BaseDirectory;
 
-    public static string DataPath =>
+    public static string BootstrapDataPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LunaTV");
 
-    public static string DownloadPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LunaTV");
+    public static string DataPath => s_dataPath ?? BootstrapDataPath;
+
+    public static string DownloadPath => s_downloadPath ?? DefaultDownloadPath;
+
+    public static string ScreenshotPath => s_screenshotPath ?? Path.Combine(DefaultDownloadPath, "Screenshots");
+
+    public static string TempPath => s_tempPath ?? Path.Combine(DataPath, "Temp");
+
+    public static string LogsPath => s_logsPath ?? Path.Combine(DataPath, "Logs");
 
     /// <summary>
     ///     App数据库连接字符串
     /// </summary>
     public static string DbConn => Path.Combine(DataPath, "lunatv.sqlite");
 
-    public static string AppJsonPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LunaTV",
-            "lunatv-app.json");
+    public static string AppJsonPath => Path.Combine(BootstrapDataPath, "lunatv-app.json");
 
     public static string FFmpegPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ffmpeg.exe");
 
-    public static string WaveformsFolder => Path.Combine(DataPath, "Waveforms");
+    public static string WaveformsFolder => s_waveformsPath ?? Path.Combine(DataPath, "Waveforms");
     public static int WaveformMinimumSampleRate { get; set; } = 126;
-    public static string SpectrogramsFolder => Path.Combine(DataPath, "Spectrograms");
+    public static string SpectrogramsFolder => s_spectrogramsPath ?? Path.Combine(DataPath, "Spectrograms");
     public static string SpectrogramStyle { get; set; } = SeSpectrogramStyle.Classic.ToString();
 
     public static bool UseFrameMode { get; set; } = false;
+
+    private static string DefaultDownloadPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LunaTV");
+
+    public static StoragePathsConfig GetDefaultStoragePaths()
+    {
+        return new StoragePathsConfig
+        {
+            DataPath = BootstrapDataPath,
+            DownloadPath = DefaultDownloadPath,
+            ScreenshotPath = Path.Combine(DefaultDownloadPath, "Screenshots"),
+            TempPath = Path.Combine(BootstrapDataPath, "Temp"),
+            LogsPath = Path.Combine(BootstrapDataPath, "Logs"),
+            WaveformsPath = Path.Combine(BootstrapDataPath, "Waveforms"),
+            SpectrogramsPath = Path.Combine(BootstrapDataPath, "Spectrograms")
+        };
+    }
+
+    public static StoragePathsConfig GetCurrentStoragePaths()
+    {
+        return new StoragePathsConfig
+        {
+            DataPath = DataPath,
+            DownloadPath = DownloadPath,
+            ScreenshotPath = ScreenshotPath,
+            TempPath = TempPath,
+            LogsPath = LogsPath,
+            WaveformsPath = WaveformsFolder,
+            SpectrogramsPath = SpectrogramsFolder
+        };
+    }
+
+    public static void ApplyStoragePaths(StoragePathsConfig? storagePaths)
+    {
+        s_dataPath = NormalizeDirectoryPath(storagePaths?.DataPath);
+        s_downloadPath = NormalizeDirectoryPath(storagePaths?.DownloadPath);
+        s_screenshotPath = NormalizeDirectoryPath(storagePaths?.ScreenshotPath);
+        s_tempPath = NormalizeDirectoryPath(storagePaths?.TempPath);
+        s_logsPath = NormalizeDirectoryPath(storagePaths?.LogsPath);
+        s_waveformsPath = NormalizeDirectoryPath(storagePaths?.WaveformsPath);
+        s_spectrogramsPath = NormalizeDirectoryPath(storagePaths?.SpectrogramsPath);
+
+        EnsureCoreDirectories();
+    }
+
+    public static void EnsureCoreDirectories()
+    {
+        EnsureDirectory(BootstrapDataPath);
+        EnsureDirectory(DataPath);
+        EnsureDirectory(DownloadPath);
+        EnsureDirectory(ScreenshotPath);
+        EnsureDirectory(TempPath);
+        EnsureDirectory(LogsPath);
+        EnsureDirectory(WaveformsFolder);
+        EnsureDirectory(SpectrogramsFolder);
+    }
+
+    public static string? NormalizeDirectoryPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return null;
+
+        var trimmed = path.Trim();
+        try
+        {
+            return Path.GetFullPath(Environment.ExpandEnvironmentVariables(trimmed));
+        }
+        catch
+        {
+            return trimmed;
+        }
+    }
+
+    private static void EnsureDirectory(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+        }
+        catch (Exception exception)
+        {
+            Trace.WriteLine($"创建目录失败：{path} {exception}");
+        }
+    }
 
     public static bool IsRunningOnWindows
     {

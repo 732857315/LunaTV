@@ -121,7 +121,9 @@ internal class LunaDownloadManager
         var dirName =
             $"{task.Id}_{OtherUtil.GetValidFileName(streamSpec.GroupId ?? "", "-")}_{streamSpec.Codecs}_{streamSpec.Bandwidth}_{streamSpec.Language}";
         var tmpDir = Path.Combine(DownloaderConfig.DirPrefix, dirName);
-        var saveDir = DownloaderConfig.MyOptions.SaveDir ?? Environment.CurrentDirectory;
+        var saveDir = DownloaderConfig.MyOptions.SaveDir;
+        if (string.IsNullOrWhiteSpace(saveDir))
+            throw new InvalidOperationException("SaveDir is required.");
         var saveName = DownloaderConfig.MyOptions.SaveName != null
             ? $"{DownloaderConfig.MyOptions.SaveName}.{streamSpec.Language}".TrimEnd('.')
             : dirName;
@@ -715,12 +717,19 @@ internal class LunaDownloadManager
                 var goTimer = new Timer(1000);
                 goTimer.Elapsed += (_, _) => { RunTask(item, task, SpeedContainerDic); };
                 goTimer.Start();
-                var result = await DownloadStreamAsync(item, task, SpeedContainerDic[task.Id]);
-                goTimer.Stop();
-                RunTask(item, task, SpeedContainerDic);
-                Results[item] = result;
-                // 失败不再下载后续
-                if (!result) break;
+                try
+                {
+                    var result = await DownloadStreamAsync(item, task, SpeedContainerDic[task.Id]);
+                    RunTask(item, task, SpeedContainerDic);
+                    Results[item] = result;
+                    // 失败不再下载后续
+                    if (!result) break;
+                }
+                finally
+                {
+                    goTimer.Stop();
+                    goTimer.Dispose();
+                }
             }
         else
             // 并发下载
@@ -755,7 +764,9 @@ internal class LunaDownloadManager
             if (DownloaderConfig.MyOptions.MuxImports != null)
                 OutputFiles.AddRange(DownloaderConfig.MyOptions.MuxImports);
             OutputFiles.ForEach(f => Logger.WarnMarkUp($"[grey]{Path.GetFileName(f.FilePath).EscapeMarkup()}[/]"));
-            var saveDir = DownloaderConfig.MyOptions.SaveDir ?? Environment.CurrentDirectory;
+            var saveDir = DownloaderConfig.MyOptions.SaveDir;
+            if (string.IsNullOrWhiteSpace(saveDir))
+                throw new InvalidOperationException("SaveDir is required.");
             var ext = OtherUtil.GetMuxExtension(DownloaderConfig.MyOptions.MuxOptions.MuxFormat);
             var dirName = Path.GetFileName(DownloaderConfig.DirPrefix);
             var outName = $"{dirName}.MUX";
@@ -776,8 +787,9 @@ internal class LunaDownloadManager
                 {
                     Logger.WarnMarkUp("[grey]Cleaning files...[/]");
                     OutputFiles.ForEach(f => File.Delete(f.FilePath));
-                    var tmpDir = DownloaderConfig.MyOptions.TmpDir ?? Environment.CurrentDirectory;
-                    OtherUtil.SafeDeleteDir(tmpDir);
+                    var tmpDir = DownloaderConfig.MyOptions.TmpDir;
+                    if (!string.IsNullOrWhiteSpace(tmpDir))
+                        OtherUtil.SafeDeleteDir(tmpDir);
                 }
             }
             else

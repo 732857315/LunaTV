@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using LunaTV.Extensions;
 using LunaTV.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Ursa.Controls;
 
 namespace LunaTV.Views;
@@ -138,7 +139,11 @@ public partial class MpvPlayerWindow : UrsaWindow
         _overlayTimer.Stop();
         _fullscreenStateGuardTimer.Stop();
         base.OnClosed(e);
-        if (!App.IsShuttingDown) (App.VisualRoot as MainWindow)?.Show();
+        if (!App.IsShuttingDown)
+        {
+            (App.VisualRoot as MainWindow)?.Show();
+            App.Services.GetRequiredService<MainViewModel>().RefreshHistory();
+        }
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

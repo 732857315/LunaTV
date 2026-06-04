@@ -187,9 +187,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         SelectedTagItem = DoubanTags.FirstOrDefault();
 
-        if (!_initialized && AppConifg.PlayerConfig.HomeAutoLoadDoubanEnabled)
-            await RefreshMovieCardsAsync();
-        else
+        if (_initialized || AppConifg.PlayerConfig.HomeAutoLoadDoubanEnabled)
             await RefreshMovieCardsAsync();
     }
 
@@ -732,6 +730,14 @@ public partial class TVShowHomeViewModel : ViewModelBase
             Topmost = true
         };
         _doubanVerifyWindow.VerificationCompleted += RefreshMovieCardsAsync;
+        _doubanVerifyWindow.Closed += (_, _) =>
+        {
+            if (_doubanVerifyWindow is not null)
+            {
+                _doubanVerifyWindow.VerificationCompleted -= RefreshMovieCardsAsync;
+                _doubanVerifyWindow = null;
+            }
+        };
         _doubanVerifyWindow.WaitForVerification();
         _doubanVerifyWindow.Show(owner);
         _doubanVerifyWindow.Activate();

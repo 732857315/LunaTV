@@ -46,6 +46,10 @@ public static class SqlSugarServiceExtensions
                 IsNullable = false,
                 DefaultValue = "0"
             });
+        }
+
+        if (!db.DbMaintenance.IsAnyColumn("player_config", "HomeAutoLoadDoubanEnabled"))
+        {
             db.DbMaintenance.AddColumn("player_config", new DbColumnInfo()
             {
                 DbColumnName = "HomeAutoLoadDoubanEnabled",
@@ -54,6 +58,10 @@ public static class SqlSugarServiceExtensions
                 IsNullable = false,
                 DefaultValue = "0"
             });
+        }
+
+        if (!db.DbMaintenance.IsAnyColumn("player_config", "ForceApiNeedSpecialSource"))
+        {
             db.DbMaintenance.AddColumn("player_config", new DbColumnInfo()
             {
                 DbColumnName = "ForceApiNeedSpecialSource",

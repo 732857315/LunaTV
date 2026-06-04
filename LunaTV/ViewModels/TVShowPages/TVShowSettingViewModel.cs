@@ -449,7 +449,7 @@ public partial class TVShowSettingViewModel : ViewModelBase
             if (response.IsSuccessStatusCode)
             {
                 var jsonString = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Response: {jsonString}");
+                Trace.WriteLine($"Response: {jsonString}");
 
                 // 解析JSON响应
                 var cloudData = JsonSerializer.Deserialize<CloudApiSourceResponse>(jsonString, new JsonSerializerOptions
@@ -486,12 +486,12 @@ public partial class TVShowSettingViewModel : ViewModelBase
             }
             else
             {
-                Console.WriteLine($"HTTP请求失败: {response.StatusCode}");
+                Trace.WriteLine($"HTTP请求失败: {response.StatusCode}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"加载云端源失败: {ex.Message}");
+            Trace.WriteLine($"加载云端源失败: {ex.Message}");
         }
     }
 

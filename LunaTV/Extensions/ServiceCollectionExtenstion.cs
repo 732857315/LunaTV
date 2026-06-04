@@ -102,6 +102,16 @@ public static class ServiceCollectionExtenstion
                 }
             );
 
+        // IMovieTvApi named HttpClient — bounded per-request timeout without a shared circuit breaker.
+        // Source-level health is tracked by MovieTvService so one flaky source won't open a
+        // global breaker for every source using the same Refit interface.
+        serviceCollection
+            .AddHttpClient(nameof(IMovieTvApi), client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(12);
+                }
+            );
+
         serviceCollection.AddSingleton<AppJsonConfigService>();
     }
 

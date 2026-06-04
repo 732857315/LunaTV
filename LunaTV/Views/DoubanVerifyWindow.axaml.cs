@@ -22,20 +22,10 @@ public partial class DoubanVerifyWindow : Window
     {
         InitializeComponent();
         Windows.Add(this);
-        Closing += (_, e) =>
-        {
-            if (_forceClose) return;
-
-            e.Cancel = true;
-            Hide();
-        };
-        Closed += (_, _) => Windows.Remove(this);
+        Closing += OnWindowClosing;
+        Closed += OnWindowClosed;
         DoubanWebView.NewWindowRequested += DoubanWebView_OnNewWindowRequested;
-        DoubanWebView.NavigationCompleted += async (_, _) =>
-        {
-            await CompleteApiFetchAsync();
-            await AutoHideAfterVerificationAsync();
-        };
+        DoubanWebView.NavigationCompleted += DoubanWebView_OnNavigationCompleted;
     }
 
     public DoubanVerifyWindow(Uri source) : this()
@@ -136,6 +126,27 @@ public partial class DoubanVerifyWindow : Window
     {
         e.Handled = true;
         new DoubanVerifyWindow(e.Request).Show();
+    }
+
+    private void OnWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_forceClose) return;
+
+        e.Cancel = true;
+        Hide();
+    }
+
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        Windows.Remove(this);
+        DoubanWebView.NewWindowRequested -= DoubanWebView_OnNewWindowRequested;
+        DoubanWebView.NavigationCompleted -= DoubanWebView_OnNavigationCompleted;
+    }
+
+    private async void DoubanWebView_OnNavigationCompleted(object? sender, EventArgs e)
+    {
+        await CompleteApiFetchAsync();
+        await AutoHideAfterVerificationAsync();
     }
 
     private void ReloadButton_OnClick(object? sender, RoutedEventArgs e)

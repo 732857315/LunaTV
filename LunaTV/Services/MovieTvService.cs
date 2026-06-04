@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using LunaTV.Base.Api;
@@ -16,12 +17,43 @@ namespace LunaTV.Services;
 public class MovieTvService
 {
     private readonly IApiFactory _apiFactory;
+    private readonly ConcurrentDictionary<string, string> _lastSearchPageErrors = new();
 
     public string? LastSearchPageError { get; private set; }
+
+    public string? GetLastSearchPageError(string source)
+    {
+        return _lastSearchPageErrors.TryGetValue(source, out var error) ? error : null;
+    }
 
     public MovieTvService(IApiFactory apiFactory)
     {
         _apiFactory = apiFactory;
+    }
+
+    private static readonly ConcurrentDictionary<string, DateTime> s_deadHosts = new();
+    private static readonly TimeSpan DeadHostTtl = TimeSpan.FromMinutes(5);
+
+    public static bool IsHostDead(string source)
+    {
+        if (s_deadHosts.TryGetValue(source, out var failureTime))
+        {
+            if (DateTime.UtcNow - failureTime < DeadHostTtl)
+                return true;
+            s_deadHosts.TryRemove(source, out _);
+        }
+
+        return false;
+    }
+
+    private static void MarkHostDead(string source)
+    {
+        s_deadHosts[source] = DateTime.UtcNow;
+    }
+
+    private static void MarkHostAlive(string source)
+    {
+        s_deadHosts.TryRemove(source, out _);
     }
 
     private static string NormalizeCoverUrl(string? cover, string baseUrl)
@@ -113,6 +145,9 @@ public class MovieTvService
         try
         {
             LastSearchPageError = null;
+            _lastSearchPageErrors.TryRemove(source, out _);
+            if (IsHostDead(source))
+                return ([], 0);
             var site = isAdult ? AppConifg.AdultApiSitesConfig[source] : AppConifg.ApiSitesConfig[source];
             var apiService = _apiFactory.CreateRefitClient<IMovieTvApi>(GetSiteRootUri(site.ApiBaseUrl));
             var results = page <= 1
@@ -125,6 +160,7 @@ public class MovieTvService
                 {
                     PropertyNameCaseInsensitive = true
                 });
+            MarkHostAlive(source);
             return json is { List.Count: > 0 }
                 ? (MapSearchResults(json.List, source, site), json.PageCount)
                 : ([], json?.PageCount ?? 0);
@@ -135,8 +171,10 @@ public class MovieTvService
         }
         catch (Exception e)
         {
+            MarkHostDead(source);
             LastSearchPageError = e.Message;
-            Console.WriteLine(e);
+            _lastSearchPageErrors[source] = e.Message;
+            System.Diagnostics.Trace.WriteLine(e);
             return ([], 0);
         }
     }
@@ -164,7 +202,7 @@ public class MovieTvService
         }
         catch (Exception e)
         {
-            Console.WriteLine(e);
+            System.Diagnostics.Trace.WriteLine(e);
         }
 
         return searchResults;
@@ -209,6 +247,7 @@ public class MovieTvService
                         episodes.AddRange(urls.Select((x, i) => new EpisodeSubject { Name = $"第{i + 1}集", Url = x }));
                     }
 
+                    MarkHostAlive(source);
                     return new DetailResult
                     {
                         VodId = vodId,
@@ -278,6 +317,7 @@ public class MovieTvService
                     Url = url
                 }).ToList();
 
+                if (episodes.Count > 0) MarkHostAlive(source);
                 return new DetailResult
                 {
                     VodId = vodId,
@@ -294,7 +334,8 @@ public class MovieTvService
         }
         catch (Exception e)
         {
-            Console.WriteLine(e);
+            MarkHostDead(source);
+            System.Diagnostics.Trace.WriteLine(e);
         }
 
 

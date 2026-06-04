@@ -38,13 +38,13 @@ public partial class MainWindow : UrsaWindow
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        App.BeginShutdown();
-        DoubanVerifyWindow.CloseAll();
         base.OnClosing(e);
+        if (!e.Cancel) DoubanVerifyWindow.CloseAll();
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        App.BeginShutdown();
         DoubanVerifyWindow.CloseAll();
         base.OnClosed(e);
     }

@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+
 using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Controls.Notifications;
@@ -48,6 +51,8 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     // /// </summary>
     // public event EventHandler? MediaPlayerInitialized;
     private bool _isLoaded;
+    private int _loadGeneration;
+    [ObservableProperty] private bool _isBuffering;
     [ObservableProperty] private bool _isMediaLoaded;
     [ObservableProperty] private bool _isMuted;
     [ObservableProperty] private bool _isPlaying;
@@ -127,20 +132,25 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     {
         if (!IsNetworkMedia(mediaUrl)) return;
 
+        var userAgent = LunaTV.Base.Constants.UserAgent.GetRandomUserAgent();
+        var referrer = GetReferrer(mediaUrl);
+        System.Diagnostics.Trace.WriteLine($"[PLAY] ConfigureNetwork url={mediaUrl} UA={userAgent} referrer={referrer}");
+
         var options = new MpvAsyncOptions { WaitForResponse = false };
-        await IgnoreUnavailablePropertyAsync(() => { Mpv.SetOptionString("cache-secs", "120"); return Task.CompletedTask; });
+        await IgnoreUnavailablePropertyAsync(() => { Mpv.SetOptionString("cache-secs", "180"); return Task.CompletedTask; });
         await Task.WhenAll(
-            IgnoreUnavailablePropertyAsync(() => Mpv.UserAgent.SetAsync(LunaTV.Base.Constants.UserAgent.GetRandomUserAgent(), options)),
-            IgnoreUnavailablePropertyAsync(() => Mpv.Referrer.SetAsync(GetReferrer(mediaUrl), options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.UserAgent.SetAsync(userAgent, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.Referrer.SetAsync(referrer, options)),
             IgnoreUnavailablePropertyAsync(() => Mpv.NetworkTimeout.SetAsync(Math.Max(5, AppConifg.PlayerConfig.Timeout / 1000.0), options)),
             IgnoreUnavailablePropertyAsync(() => Mpv.Cache.SetAsync(true, options)),
             IgnoreUnavailablePropertyAsync(() => Mpv.CachePause.SetAsync(true, options)),
             IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseInitial.SetAsync(true, options)),
-            IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseWait.SetAsync(5, options)),
-            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerReadAheadSecs.SetAsync(20, options)),
-            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBytes.SetAsync(150 * 1024 * 1024, options)),
-            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBackBytes.SetAsync(30 * 1024 * 1024, options)));
+            IgnoreUnavailablePropertyAsync(() => Mpv.CachePauseWait.SetAsync(2, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerReadAheadSecs.SetAsync(60, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBytes.SetAsync(256 * 1024 * 1024, options)),
+            IgnoreUnavailablePropertyAsync(() => Mpv.DemuxerMaxBackBytes.SetAsync(64 * 1024 * 1024, options)));
     }
+
 
     private string GetPlaybackErrorText()
     {
@@ -183,11 +193,12 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
     public async Task OnWindowLoaded()
     {
-        await Task.Delay(100); // Fails to load if we don't give a slight delay.
-
         Mpv!.FileLoaded += PlayerFileLoaded;
         Mpv.EndFile += PlayerEndFile;
         Mpv.TimePos.Changed += PlayerPositionChanged;
+        Mpv.PausedForCache.Changed += PlayerPausedForCacheChanged;
+
+        await Task.Delay(100); // Fails to load if we don't give a slight delay.
 
         var options = new MpvAsyncOptions { WaitForResponse = false };
         await IgnoreUnavailablePropertyAsync(() => Mpv.Volume.SetAsync(Volume, options));
@@ -204,15 +215,31 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
 
         if (!_isLoaded)
         {
+            var generation = Interlocked.Increment(ref _loadGeneration);
+
             await IgnoreUnavailablePropertyAsync(() => Mpv!.Stop().InvokeAsync());
+            if (generation != _loadGeneration) return;
             await IgnoreUnavailablePropertyAsync(() => Mpv.Pause.SetAsync(false));
+            if (generation != _loadGeneration) return;
             if (!string.IsNullOrEmpty(MediaUrl))
             {
                 _ = Loading();
                 try
                 {
                     await ConfigureNetworkPlaybackAsync(MediaUrl!);
+                    if (generation != _loadGeneration) return;
+                    // Resume by starting decode at the saved position so mpv doesn't play from 0
+                    // and seek afterward, which caused a visible stutter and the opening playing first.
+                    var resumePosition = Math.Max(0, ViewHistory?.PlaybackPosition ?? 0);
+                    System.Diagnostics.Trace.WriteLine($"[PLAY] LoadFile url={MediaUrl} resumePosition={resumePosition} historyPos={ViewHistory?.PlaybackPosition}");
+                    await IgnoreUnavailablePropertyAsync(() =>
+                    {
+                        Mpv.SetOptionString("start", resumePosition > 0 ? resumePosition.ToString(CultureInfo.InvariantCulture) : "none");
+                        return Task.CompletedTask;
+                    });
+                    if (generation != _loadGeneration) return;
                     await Mpv.LoadFile(MediaUrl!).InvokeAsync();
+                    if (generation != _loadGeneration) return;
                     IsPlaying = true;
                     _isLoaded = true;
                     MediaPlayerOnLoaded();
@@ -241,9 +268,28 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     {
         if (IsMediaLoaded && Mpv is not null)
         {
-            IgnoreUnavailableProperty(() => _lastPositionValue = Mpv.TimePos.Get() ?? _lastPositionValue);
+            try
+            {
+                var actualPosition = Mpv.TimePos.Get();
+                if (actualPosition.HasValue)
+                {
+                    var position = actualPosition.Value;
+                    if (position > 0)
+                    {
+                        _lastPositionValue = position;
+                    }
+                    else if (position == 0 && _lastPositionValue <= 5)
+                    {
+                        _lastPositionValue = 0;
+                    }
+                }
+            }
+            catch (MpvException e) when (e.Message.Contains("property unavailable", StringComparison.OrdinalIgnoreCase))
+            {
+            }
         }
 
+        System.Diagnostics.Trace.WriteLine($"[HIST] SaveCurrentViewHistory _lastPositionValue={_lastPositionValue} IsMediaLoaded={IsMediaLoaded}");
         FlushPendingPosition();
         SaveViewHistory();
     }
@@ -262,12 +308,14 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         IsPlaying = false;
         Status = PlaybackStatus.Stopped;
         IsMediaLoaded = false;
+        IsBuffering = false;
         Duration = TimeSpan.FromSeconds(1);
         Position = TimeSpan.Zero;
     }
 
     public void Stop()
     {
+        System.Diagnostics.Trace.WriteLine("[HIST] Stop() called");
         SaveCurrentViewHistory();
         IgnoreUnavailableProperty(() => Mpv.Pause.Set(false));
         IgnoreUnavailableProperty(() => Mpv!.Stop().Invoke());
@@ -349,7 +397,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     {
         if (IsMediaLoaded)
         {
-            var path = Path.Combine(GlobalDefine.DownloadPath);
+            var path = Path.Combine(GlobalDefine.ScreenshotPath);
             if (!Directory.Exists(path))
             {
                 Directory.CreateDirectory(path);
@@ -433,14 +481,26 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             IsMediaLoaded = true;
             if (Duration > TimeSpan.FromSeconds(1))
             {
+                // Resume is handled by the "start" load option in PlayPause, so mpv already begins
+                // decoding at this position. Just sync the UI without seeking again.
                 var resumePosition = Math.Max(0, Math.Min(ViewHistory?.PlaybackPosition ?? 0, (int)Duration.TotalSeconds));
-                lock (Mpv!)
-                {
-                    IgnoreUnavailableProperty(() => Mpv.TimePos.Set(resumePosition));
-                }
-
                 _lastPositionValue = resumePosition;
                 SetPositionNoSeek(TimeSpan.FromSeconds(resumePosition));
+                if (resumePosition > 2)
+                {
+                    try
+                    {
+                        var actualPosition = Mpv!.TimePos.Get();
+                        if (actualPosition.HasValue && Math.Abs(actualPosition.Value - resumePosition) > 3)
+                        {
+                            System.Diagnostics.Trace.WriteLine($"[PLAY] start fallback seek actual={actualPosition.Value} expected={resumePosition}");
+                            IgnoreUnavailableProperty(() => Mpv.TimePos.Set(resumePosition));
+                        }
+                    }
+                    catch (MpvException e) when (e.Message.Contains("property unavailable", StringComparison.OrdinalIgnoreCase))
+                    {
+                    }
+                }
             }
             else
             {
@@ -460,6 +520,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
                 IsPlaying = false;
                 _isLoaded = false;
                 IsMediaLoaded = false;
+                IsBuffering = false;
                 return;
             }
 
@@ -472,7 +533,16 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     /// MPV播放刷新进度条
     private void PlayerPositionChanged(object? sender, MpvValueChangedEventArgs<double, double> e)
     {
-        _lastPositionValue = e.NewValue!.Value;
+        var newValue = e.NewValue!.Value;
+        // mpv emits a final time-pos = 0 when a file ends or is unloaded; ignoring it keeps
+        // the real position from being clobbered before watch history is saved on Stop().
+        if (newValue <= 0 && _lastPositionValue > 1)
+        {
+            return;
+        }
+
+        _lastPositionValue = newValue;
+        System.Diagnostics.Trace.WriteLine($"[HIST] PosChanged _lastPositionValue={_lastPositionValue}");
         var now = DateTime.UtcNow;
         if ((now - _lastPositionUpdateTime).TotalMilliseconds >= 150)
         {
@@ -480,6 +550,12 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
             var pos = TimeSpan.FromSeconds(_lastPositionValue);
             Dispatcher.UIThread.Post(() => SetPositionNoSeek(pos));
         }
+    }
+
+    private void PlayerPausedForCacheChanged(object? sender, MpvValueChangedEventArgs<bool, bool> e)
+    {
+        var paused = e.NewValue ?? false;
+        Dispatcher.UIThread.Post(() => IsBuffering = paused && IsMediaLoaded);
     }
 
     /// <summary>
@@ -517,6 +593,16 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
         }
         else
         {
+            Interlocked.Increment(ref _loadGeneration);
+            if (_isLoaded)
+            {
+                IgnoreUnavailableProperty(() => Mpv.Pause.Set(false));
+                IgnoreUnavailableProperty(() => Mpv!.Stop().Invoke());
+                _isLoaded = false;
+                IsPlaying = false;
+                IsMediaLoaded = false;
+            }
+
             Dispatcher.UIThread.InvokeAsync(async () => { await PlayPause(); });
         }
     }

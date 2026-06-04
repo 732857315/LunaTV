@@ -1,6 +1,9 @@
 ﻿using Avalonia;
 using Avalonia.Dialogs;
+using LunaTV.Constants;
 using LunaTV.Extensions;
+using LunaTV.Models;
+using LunaTV.Services;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Text;
@@ -28,6 +31,11 @@ internal sealed class Program
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
     {
+        var appJsonConfig = AppJsonConfigService.ReadJson<AppJsonConfig>(GlobalDefine.AppJsonPath) ?? new AppJsonConfig();
+        appJsonConfig.Player ??= new Player();
+        appJsonConfig.StoragePaths ??= new StoragePathsConfig();
+        GlobalDefine.ApplyStoragePaths(appJsonConfig.StoragePaths);
+
         IHost host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {

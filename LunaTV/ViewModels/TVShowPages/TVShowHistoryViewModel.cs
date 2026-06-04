@@ -119,6 +119,7 @@ public partial class TVShowHistoryViewModel : ViewModelBase
             .ToList();
         foreach (var item in historyItems)
         {
+            System.Diagnostics.Trace.WriteLine($"[HIST] LoadHistory Id={item.Id} Name={item.Name} PlaybackPosition={item.PlaybackPosition} Duration={item.Duration}");
             var historyItem = new HistoryItems
             {
                 Id = item.Id,

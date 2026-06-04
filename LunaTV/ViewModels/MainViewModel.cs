@@ -18,27 +18,7 @@ namespace LunaTV.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
-    private readonly Dictionary<string, UserControl> _viewDictionary = new()
-    {
-        ["首页"] = new TVShowHomeView
-        {
-            DataContext = new TVShowHomeViewModel()
-        },
-        ["搜索"] = new TVShowSearchView
-        {
-            DataContext = new TVShowSearchViewModel()
-        },
-        // ["筛选"] = new TVShowFilterView
-        // {
-        //     DataContext = new TVShowFilterViewModel()
-        // },
-        ["历史"] = App.Services.GetRequiredService<TVShowHistoryView>(),
-        ["下载"] = App.Services.GetRequiredService<TVDownloadView>(),
-        ["配置"] = new TVShowSettingView
-        {
-            DataContext = new TVShowSettingViewModel()
-        }
-    };
+    private readonly Dictionary<string, UserControl> _viewDictionary;
 
     private readonly IWebApi _webApi;
 
@@ -83,7 +63,6 @@ public partial class MainViewModel : ViewModelBase
                 Data = App.TopLevel.TryFindResource("SemiIconSetting", out var value6) ? (StreamGeometry)value6 : null
             }
         };
-        SelectedItem = Items[0];
 
 
         //初始化配置
@@ -117,6 +96,29 @@ public partial class MainViewModel : ViewModelBase
         {
             AppConifg.PlayerConfig = playerConfig;
         }
+
+        _viewDictionary = new()
+        {
+            ["首页"] = new TVShowHomeView
+            {
+                DataContext = new TVShowHomeViewModel()
+            },
+            ["搜索"] = new TVShowSearchView
+            {
+                DataContext = new TVShowSearchViewModel()
+            },
+            // ["筛选"] = new TVShowFilterView
+            // {
+            //     DataContext = new TVShowFilterViewModel()
+            // },
+            ["历史"] = App.Services.GetRequiredService<TVShowHistoryView>(),
+            ["下载"] = App.Services.GetRequiredService<TVDownloadView>(),
+            ["配置"] = new TVShowSettingView
+            {
+                DataContext = new TVShowSettingViewModel()
+            }
+        };
+        SelectedItem = Items[0];
     }
 
     public ObservableCollection<TVMenuItem> Items { get; set; }
@@ -155,6 +157,15 @@ public partial class MainViewModel : ViewModelBase
     public UserControl GetControl(string name)
     {
         return _viewDictionary[name];
+    }
+
+    public void RefreshHistory()
+    {
+        if (_viewDictionary.TryGetValue("历史", out var control)
+            && control.DataContext is TVShowHistoryViewModel historyViewModel)
+        {
+            historyViewModel.RefreshHistoryItems();
+        }
     }
 }
 

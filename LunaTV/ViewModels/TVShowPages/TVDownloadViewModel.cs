@@ -29,6 +29,8 @@ public partial class TVDownloadViewModel : ViewModelBase
     private readonly SugarRepository<MediaDownload> _mediaDownloadTable;
     private readonly Dictionary<int, int> _downloadPersistTicks = new();
     private MediaDownloadViewModel? _currentDownloadingMVM;
+    private int _lastLoggedWaitingCount = -1;
+    private string? _lastLoggedDownloadingName;
 
     [ObservableProperty] private int _downloadingCount;
     [ObservableProperty] private string _downloadName = "曼达洛人";
@@ -161,7 +163,12 @@ public partial class TVDownloadViewModel : ViewModelBase
             {
                 if (MediaDownloadViewModels.Count > 0)
                 {
-                    Console.WriteLine($"等待下载：{MediaDownloadViewModels.Count}");
+                    if (_lastLoggedWaitingCount != MediaDownloadViewModels.Count)
+                    {
+                        _lastLoggedWaitingCount = MediaDownloadViewModels.Count;
+                        Trace.WriteLine($"等待下载：{MediaDownloadViewModels.Count}");
+                    }
+
                     _currentDownloadingMVM =
                         MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
                     if (_currentDownloadingMVM != null)
@@ -174,15 +181,23 @@ public partial class TVDownloadViewModel : ViewModelBase
             {
                 if (_currentDownloadingMVM.DownloadStatus == DownloadType.Downloading)
                 {
-                    Console.WriteLine($"下载中：{_currentDownloadingMVM.Name}");
+                    if (_lastLoggedDownloadingName != _currentDownloadingMVM.Name)
+                    {
+                        _lastLoggedDownloadingName = _currentDownloadingMVM.Name;
+                        Trace.WriteLine($"下载中：{_currentDownloadingMVM.Name}");
+                    }
+
                     // 刷新下载进度
                     Downloading(_currentDownloadingMVM);
                     if (_currentDownloadingMVM.DownloadStatus != DownloadType.Downloading)
                     {
-                        Console.WriteLine($"下载完成：{_currentDownloadingMVM.Name}");
+                        Trace.WriteLine($"下载完成：{_currentDownloadingMVM.Name}");
                         await PersistDownloadAsync(_currentDownloadingMVM);
+                        RefreshFilteredDownloads();
                         _downloadManagers.Remove(_currentDownloadingMVM.Id);
                         _downloadPersistTicks.Remove(_currentDownloadingMVM.Id);
+                        _lastLoggedWaitingCount = -1;
+                        _lastLoggedDownloadingName = null;
                         _currentDownloadingMVM =
                             MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
                         if (_currentDownloadingMVM != null)
@@ -199,13 +214,14 @@ public partial class TVDownloadViewModel : ViewModelBase
         }
         catch (Exception exception)
         {
-            Console.WriteLine(exception);
+            Trace.WriteLine(exception);
             if (_currentDownloadingMVM is not null)
             {
                 _currentDownloadingMVM.DownloadStatus = DownloadType.DownloadFailed;
                 _currentDownloadingMVM.Status = StatusWord.DownloadFailed;
                 _currentDownloadingMVM.ErrorMessage = exception.Message;
                 await PersistDownloadAsync(_currentDownloadingMVM);
+                RefreshFilteredDownloads();
             }
         }
     }
@@ -310,11 +326,43 @@ public partial class TVDownloadViewModel : ViewModelBase
     private async void PreDownload(MediaDownloadViewModel mdvm)
     {
         mdvm.DownloadStatus = DownloadType.Downloading;
-        _downloadManagers[mdvm.Id] = new DownloadManager();
+        var downloadManager = new DownloadManager();
+        if (downloadManager.Option is not null)
+        {
+            downloadManager.Option.TmpDir = GlobalDefine.TempPath;
+            downloadManager.Option.LogFilePath = Path.Combine(GlobalDefine.LogsPath, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}_{mdvm.Id}.log");
+            downloadManager.SetFFmpegPath(GlobalDefine.FFmpegPath);
+        }
+
+        _downloadManagers[mdvm.Id] = downloadManager;
         mdvm.Status = StatusWord.Downloading;
         mdvm.ErrorMessage = null;
         await PersistDownloadAsync(mdvm);
-        Task.Run(async () => await _downloadManagers[mdvm.Id].DownloadAsync(mdvm.Url!, mdvm.LocalPath!, mdvm.Name!));
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _downloadManagers[mdvm.Id].DownloadAsync(mdvm.Url!, mdvm.LocalPath!, mdvm.Name!);
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine(ex);
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    if (mdvm.DownloadStatus == DownloadType.Downloading)
+                    {
+                        mdvm.DownloadStatus = DownloadType.DownloadFailed;
+                        mdvm.Status = StatusWord.DownloadFailed;
+                        mdvm.ErrorMessage = ex.Message;
+                        if (DownloadingCount > 0) DownloadingCount -= 1;
+                        await PersistDownloadAsync(mdvm);
+                        RefreshFilteredDownloads();
+                    }
+                });
+                _downloadManagers.Remove(mdvm.Id);
+                _downloadPersistTicks.Remove(mdvm.Id);
+            }
+        });
         WaitingCount -= 1;
         DownloadingCount += 1;
     }
@@ -331,10 +379,10 @@ public partial class TVDownloadViewModel : ViewModelBase
             mdvm.RemainingTime = downloadStatus.remainingTimeStr;
             mdvm.DownloadedBytes = downloadStatus.size;
             mdvm.TotalBytes = downloadStatus.totalSize;
-            mdvm.OutputFilePath = ResolveOutputFilePath(downloadStatus, mdvm);
             if (downloadStatus.downloadType != DownloadType.None)
             {
                 mdvm.DownloadStatus = downloadStatus.downloadType;
+                mdvm.OutputFilePath = ResolveOutputFilePath(downloadStatus, mdvm);
 
                 if (mdvm.DownloadStatus == DownloadType.Downloaded)
                 {
@@ -352,7 +400,6 @@ public partial class TVDownloadViewModel : ViewModelBase
 
             if (mdvm.DownloadStatus == DownloadType.Downloading && ShouldPersistDownloadTick(mdvm.Id))
                 _ = PersistDownloadAsync(mdvm);
-            RefreshFilteredDownloads();
         }
     }
 
@@ -581,7 +628,7 @@ public partial class MediaDownloadViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.Message);
+            Trace.WriteLine(ex.Message);
         }
     }
 }
