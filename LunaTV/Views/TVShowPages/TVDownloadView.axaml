@@ -84,12 +84,33 @@
 
         </StackPanel>
 
-        <DockPanel Grid.Row="1" Margin="20,10">
+        <DockPanel
+            Grid.Row="1"
+            HorizontalSpacing="8"
+            Margin="20,10">
             <TextBlock
-                Classes="H6"
+                Classes="H3"
                 HorizontalAlignment="Left"
                 Text="下载管理"
-                Theme="{DynamicResource TitleTextBlock}" />
+                Theme="{DynamicResource TitleTextBlock}"
+                VerticalAlignment="Center" />
+
+            <Border Background="{DynamicResource SemiColorNavBackground}">
+                <Border.Styles>
+                    <Style Selector="RadioButton">
+                        <Setter Property="Theme" Value="{DynamicResource PureCardRadioButton}" />
+                        <Setter Property="Command" Value="{Binding SwitchDownloadOrHistoryCommand}" />
+                        <Setter Property="CommandParameter" Value="{Binding $self.Content}" />
+                    </Style>
+                    <Style Selector="RadioButton:checked /template/ ContentPresenter#PART_ContentPresenter">
+                        <Setter Property="Background" Value="{DynamicResource SemiPink3}" />
+                    </Style>
+                </Border.Styles>
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Content="下载" IsChecked="{Binding DownloadOrHistoryChecked}" />
+                    <RadioButton Content="历史" />
+                </StackPanel>
+            </Border>
 
             <TextBlock
                 DockPanel.Dock="Right"
@@ -112,6 +133,7 @@
             Grid.Row="2"
             HeadersVisibility="All"
             IsReadOnly="True"
+            IsVisible="{Binding DownloadOrHistoryChecked}"
             ItemsSource="{Binding MediaDownloadViewModels}"
             Margin="8">
             <DataGrid.Styles>
@@ -199,6 +221,80 @@
                                     Theme="{DynamicResource BorderlessButton}"
                                     ToolTip.Tip="{Binding LocalPath}">
                                     <PathIcon Data="{DynamicResource SemiIconFolderOpen}" Theme="{DynamicResource InnerPathIcon}" />
+                                </Button>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn
+                    Binding="{Binding UpdateTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"
+                    Header="下载时间"
+                    Width="*" />
+            </DataGrid.Columns>
+
+        </DataGrid>
+
+        <DataGrid
+            CanUserReorderColumns="True"
+            CanUserResizeColumns="True"
+            CanUserSortColumns="True"
+            Grid.Row="2"
+            HeadersVisibility="All"
+            IsReadOnly="True"
+            IsVisible="{Binding !DownloadOrHistoryChecked}"
+            ItemsSource="{Binding MediaHistoryViewModels}"
+            Margin="8">
+            <DataGrid.Columns>
+                <DataGridTextColumn
+                    Binding="{Binding Name}"
+                    Header="影视名称"
+                    Width="*" />
+
+                <DataGridTemplateColumn Header="状态" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Label
+                                Background="{Binding Status, Converter={StaticResource StatusToBackgroundConverter}}"
+                                Content="{Binding Status}"
+                                Foreground="{DynamicResource LabelTagSolidForeground}"
+                                Theme="{DynamicResource TagLabel}" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="操作" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel
+                                Margin="4,4"
+                                Orientation="Horizontal"
+                                Spacing="4">
+                                <Button
+                                    Classes="TransparentButton"
+                                    Theme="{DynamicResource BorderlessButton}"
+                                    ToolTip.Tip="{Binding Url}">
+                                    <PathIcon Data="{DynamicResource SemiIconLink}" Theme="{DynamicResource InnerPathIcon}" />
+                                </Button>
+                                <Button
+                                    Classes="TransparentButton"
+                                    Command="{Binding OpenFolderCommand}"
+                                    Theme="{DynamicResource BorderlessButton}"
+                                    ToolTip.Tip="{Binding LocalPath}">
+                                    <PathIcon Data="{DynamicResource SemiIconFolderOpen}" Theme="{DynamicResource InnerPathIcon}" />
+                                </Button>
+                                <Button
+                                    Classes="TransparentButton"
+                                    Command="{Binding PlayCommand}"
+                                    Theme="{DynamicResource BorderlessButton}"
+                                    ToolTip.Tip="{Binding Name}">
+                                    <PathIcon Data="{DynamicResource SemiIconPlay}" Theme="{DynamicResource InnerPathIcon}" />
+                                </Button>
+                                <Button
+                                    Classes="TransparentButton"
+                                    Command="{Binding $parent[UserControl].((vm:TVDownloadViewModel)DataContext).DeleteFromDbAsyncCommand}"
+                                    CommandParameter="{Binding Id}"
+                                    Theme="{DynamicResource BorderlessButton}"
+                                    ToolTip.Tip="删除">
+                                    <PathIcon Data="{DynamicResource SemiIconDelete}" Theme="{DynamicResource InnerPathIcon}" />
                                 </Button>
                             </StackPanel>
                         </DataTemplate>

@@ -54,7 +54,7 @@ public partial class MpvPlayerWindowModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _speedText = "1x";
 
     private PlaybackStatus _status;
-    [ObservableProperty] private string? _title = "无";
+    [ObservableProperty] private string? _title = "LunaTV";
     [ObservableProperty] private int _volume = 70;
 
     public MpvPlayerWindowModel()

@@ -13,6 +13,7 @@ using LunaTV.Base.DB.UnitOfWork;
 using LunaTV.Base.Models;
 using LunaTV.Constants;
 using LunaTV.ViewModels.Base;
+using LunaTV.Views;
 using M3U8Download;
 using Microsoft.Extensions.DependencyInjection;
 using Ursa.Controls;
@@ -26,10 +27,11 @@ public partial class TVDownloadViewModel : ViewModelBase
 
     private readonly DispatcherTimer _downloadTimer;
     private readonly SugarRepository<MediaDownload> _mediaDownloadTable;
-    private MediaDownloadViewModel? _currentDownloadingMVM;
+    private MediaDownloadViewModel? _currentDownloadingMvm;
 
     [ObservableProperty] private int _downloadingCount;
     [ObservableProperty] private string _downloadName = "曼达洛人";
+    [ObservableProperty] private bool _downloadOrHistoryChecked = true;
     [ObservableProperty] private string _downloadUrl = "https://vod.360zyx.vip/20250708/7T2xjBRd/index.m3u8";
     private bool _isInitialized;
 
@@ -40,16 +42,23 @@ public partial class TVDownloadViewModel : ViewModelBase
     {
         _mediaDownloadTable = App.Services.GetRequiredService<SugarRepository<MediaDownload>>();
         MediaDownloadViewModels = new ObservableCollection<MediaDownloadViewModel>();
+        MediaHistoryViewModels = new ObservableCollection<MediaDownloadViewModel>();
+
         _downloadTimer = new DispatcherTimer
             (TimeSpan.FromSeconds(1), DispatcherPriority.Background, DownloadTimerOnTick);
         _downloadTimer.Start();
-        Dispatcher.UIThread.InvokeAsync(async () => { await LoadUnDownloadFromDBAsync(); });
+        Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await LoadUnDownloadFromDbAsync();
+            await LoadDownloadHistoryFromDbAsync();
+        });
     }
 
     public ObservableCollection<MediaDownloadViewModel> MediaDownloadViewModels { get; set; }
+    public ObservableCollection<MediaDownloadViewModel> MediaHistoryViewModels { get; set; }
 
     // 从数据库加载下载任务
-    private async Task LoadUnDownloadFromDBAsync()
+    private async Task LoadUnDownloadFromDbAsync()
     {
         var unDownloads = await _mediaDownloadTable.GetListAsync(x => !x.IsDownloaded);
         foreach (var downloadTask in unDownloads)
@@ -81,6 +90,29 @@ public partial class TVDownloadViewModel : ViewModelBase
         }
     }
 
+    private async Task LoadDownloadHistoryFromDbAsync()
+    {
+        var downloads = await _mediaDownloadTable.GetListAsync(x => x.IsDownloaded);
+        MediaHistoryViewModels.Clear();
+        foreach (var download in downloads)
+        {
+            MediaHistoryViewModels.Add(new MediaDownloadViewModel
+            {
+                Id = download.Id,
+                Name = download.Name,
+                Episode = download.Episode,
+                Url = download.Url,
+                DownloadStatus = DownloadType.None,
+                LocalPath = download.LocalPath,
+                Status = string.IsNullOrEmpty(MediaDownloadViewModel.GetMediaPath(download.LocalPath, download.Name))
+                    ? StatusWord.DownloadFailed
+                    : StatusWord.Downloaded,
+                Progress = 100,
+                UpdateTime = download.UpdateTime
+            });
+        }
+    }
+
     private async void DownloadTimerOnTick(object? sender, EventArgs e)
     {
         if (!_isInitialized || !File.Exists(GlobalDefine.FFmpegPath))
@@ -90,30 +122,30 @@ public partial class TVDownloadViewModel : ViewModelBase
 
         try
         {
-            if (_currentDownloadingMVM is null)
+            if (_currentDownloadingMvm is null)
             {
                 if (MediaDownloadViewModels.Count > 0)
                 {
-                    _currentDownloadingMVM =
+                    _currentDownloadingMvm =
                         MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
-                    if (_currentDownloadingMVM != null)
+                    if (_currentDownloadingMvm != null)
                     {
-                        Console.WriteLine($"开始下载：{_currentDownloadingMVM.Name}");
-                        PreDownload(_currentDownloadingMVM);
+                        Console.WriteLine($"开始下载：{_currentDownloadingMvm.Name}");
+                        PreDownload(_currentDownloadingMvm);
                     }
                 }
             }
             else
             {
-                if (_currentDownloadingMVM.DownloadStatus == DownloadType.Downloading)
+                if (_currentDownloadingMvm.DownloadStatus == DownloadType.Downloading)
                 {
-                    Console.WriteLine($"下载中：{_currentDownloadingMVM.Name}");
+                    Console.WriteLine($"下载中：{_currentDownloadingMvm.Name}");
                     // 刷新下载进度
-                    Downloading(_currentDownloadingMVM);
+                    Downloading(_currentDownloadingMvm);
                 }
                 else
                 {
-                    _currentDownloadingMVM = null;
+                    _currentDownloadingMvm = null;
                 }
             }
         }
@@ -222,12 +254,12 @@ public partial class TVDownloadViewModel : ViewModelBase
             mdvm.DownloadStatus = result ? DownloadType.Downloaded : DownloadType.DownloadFailed;
             mdvm.Status = result ? StatusWord.Downloaded : StatusWord.DownloadFailed;
             DownloadingCount -= 1;
-            _currentDownloadingMVM =
+            _currentDownloadingMvm =
                 MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
-            if (_currentDownloadingMVM != null)
+            if (_currentDownloadingMvm != null)
             {
-                Console.WriteLine($"开始下载：{_currentDownloadingMVM.Name}");
-                PreDownload(_currentDownloadingMVM);
+                Console.WriteLine($"开始下载：{_currentDownloadingMvm.Name}");
+                PreDownload(_currentDownloadingMvm);
             }
         });
         WaitingCount -= 1;
@@ -259,6 +291,34 @@ public partial class TVDownloadViewModel : ViewModelBase
         // 外部资源下载
         await AddMediaDownload(DownloadName, DownloadUrl);
     }
+
+    [RelayCommand]
+    private async Task SwitchDownloadOrHistory(string tag)
+    {
+        if (tag != "历史") return;
+
+        await LoadDownloadHistoryFromDbAsync();
+    }
+
+    [RelayCommand]
+    private async void DeleteFromDbAsync(int id)
+    {
+        var history = MediaHistoryViewModels.FirstOrDefault(x => x.Id == id);
+        if (history == null) return;
+
+        // 遍历文件夹
+        var files = Directory.GetFiles(history.LocalPath, "*.mp4", SearchOption.TopDirectoryOnly);
+        foreach (var file in files)
+        {
+            if (Path.GetFileName(file).StartsWith(history.Name))
+            {
+                File.Delete(file);
+            }
+        }
+
+        await _mediaDownloadTable.DeleteByIdAsync(id);
+        MediaHistoryViewModels.Remove(history);
+    }
 }
 
 public partial class MediaDownloadViewModel : ObservableObject
@@ -278,7 +338,7 @@ public partial class MediaDownloadViewModel : ObservableObject
     public DateTime UpdateTime { get; set; }
 
     [RelayCommand]
-    public void OpenFolder()
+    private void OpenFolder()
     {
         if (string.IsNullOrEmpty(LocalPath)) return;
 
@@ -296,6 +356,32 @@ public partial class MediaDownloadViewModel : ObservableObject
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
+        }
+    }
+
+    public static string? GetMediaPath(string localPath, string name)
+    {
+        if (string.IsNullOrEmpty(localPath)) return null;
+        // 遍历文件夹
+        var files = Directory.GetFiles(localPath, "*.mp4", SearchOption.TopDirectoryOnly);
+        var match = files.FirstOrDefault(file =>
+            Path.GetFileName(file).StartsWith(name));
+        return match;
+    }
+
+    [RelayCommand]
+    private void Play()
+    {
+        var path = GetMediaPath(LocalPath, Name);
+        if (string.IsNullOrEmpty(path)) return;
+
+        var win = new MpvPlayerWindow();
+        (App.VisualRoot as MainWindow)?.Hide();
+        win.Show();
+        if (win.DataContext is MpvPlayerWindowModel videoModel)
+        {
+            videoModel.MediaUrl = path;
+            videoModel.Title = Name;
         }
     }
 }
