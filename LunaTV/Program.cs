@@ -1,11 +1,13 @@
 ﻿using Avalonia;
 using Avalonia.Dialogs;
+using Avalonia.Media;
 using LunaTV.Constants;
 using LunaTV.Extensions;
 using LunaTV.Models;
 using LunaTV.Services;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace LunaTV;
@@ -66,16 +68,32 @@ internal sealed class Program
                 ]
             })
             .With(new Win32PlatformOptions())
-            // .With(new FontManagerOptions
-            // {
-            //     FontFallbacks = new[]
-            //     {
-            //         new FontFallback
-            //         {
-            //             FontFamily = new FontFamily("PingFang SC")
-            //         }
-            //     }
-            // })
+            .With(new FontManagerOptions
+            {
+                FontFallbacks = new[]
+                {
+                    new FontFallback
+                    {
+                        FontFamily = new FontFamily(GetFontFamily())
+                    }
+                }
+            })
             .LogToTrace();
+    }
+
+    private static string GetFontFamily()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // windows下使用微软雅黑
+            return "微软雅黑";
+        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            // macos下使用pingfang sc
+            return "PingFang SC";
+        }
+
+        return "";
     }
 }

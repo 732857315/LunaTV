@@ -5,10 +5,24 @@
 - [LibreTV](https://github.com/LibreSpark/LibreTV)
 - [LibreTV-App](https://github.com/KeyRotate/LibreTV-App)
 
-## 首页
+# Mac食用指南
 
-![screenshot-1.png](screenshots/screenshot-1.png)
+安装 `brew install mpv`
 
-## 搜索界面
+会同时安装ffmpeg。
 
-![screenshot-2.png](screenshots/screenshot-2.png)
+# 搜索界面
+
+![screenshot-search.png](screenshots/screenshot-search.png)
+
+## 历史界面
+
+![screenshot-history.png](screenshots/screenshot-history.png)
+
+## 设下载面
+
+![screenshot-download.png](screenshots/screenshot-download.png)
+
+## 设置界面
+
+![screenshot-settings.png](screenshots/screenshot-settings.png)

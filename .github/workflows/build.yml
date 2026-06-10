@@ -1,0 +1,148 @@
+name: Build
+
+# MANUAL TRIGGER ONLY - Creates a new GitHub Release with desktop app artifacts.
+# Go to Actions → Release → Run workflow → Enter version (e.g., 0.1.0)
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0.0) - without "v" prefix'
+        required: true
+        type: string
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'  # 'recursive' 会拉取主仓库以及所有嵌套子模块
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Read Version from LunaTV/LunaTV.csproj
+        id: get_version
+        shell: pwsh
+        run: |
+          $csprojPath = "LunaTV/LunaTV.csproj"
+          [xml]$xml = Get-Content $csprojPath
+          $version = $xml.Project.PropertyGroup.AssemblyVersion
+          if (-not $version) { $version = "0.0.0.0" }
+          Write-Host "提取到的版本号: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Read the changelog
+        uses: ForNeVeR/ChangelogAutomation.action@v2
+        id: changelog_section
+        with:
+          input: ./CHANGELOG.md
+          output: ./changelog-section.md
+      - name: Release body from changelog
+        id: release_body
+        run: |
+          {
+            echo 'body<<EOF'
+            cat changelog-section.md
+            echo ''
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish Desktop App (win-x64)
+        shell: pwsh
+        run: |
+          dotnet publish LunaTV/LunaTV.csproj `
+            -c Release `
+            -r win-x64 `
+            -p:DebugType=None -p:DebugSymbols=false `
+            --self-contained true `
+            -o ./publish
+
+      - name: Zip artifact
+        shell: pwsh
+        run: |
+          $artifactName = "LunaTV-${{ steps.get_version.outputs.version }}-Windows-x64"
+          Expand-Archive -Path "./publish/libmpv-2.zip" -DestinationPath "./publish"
+          Remove-Item -Path "./publish/libmpv-2.zip"
+          Get-ChildItem -Path . -Filter './publish/*.pdb' | Remove-Item
+          Remove-Item './publish/de','./publish/es','./publish/fr','./publish/it','./publish/ja','./publish/ko','./publish/pt-BR','./publish/ru','./publish/zh-Hans','./publish/zh-Hant' -Recurse -Force
+          Compress-Archive -Path ./publish/* -DestinationPath "./$artifactName.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: "v${{ steps.get_version.outputs.version }}"
+          files: LunaTV-${{ steps.get_version.outputs.version }}-Windows-x64.zip
+          generate_release_notes: true
+          body_path: ./changelog-section.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        cpu: [ x64, arm64 ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'  # 'recursive' 会拉取主仓库以及所有嵌套子模块
+      - name: Install Tool Via HomeBrew
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=true
+          export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=true
+          brew install create-dmg tree
+      - name: Install .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Read Version from LunaTV/LunaTV.csproj
+        id: get_version
+        shell: pwsh
+        run: |
+          $csprojPath = "LunaTV/LunaTV.csproj"
+          [xml]$xml = Get-Content $csprojPath
+          $version = $xml.Project.PropertyGroup.AssemblyVersion
+          if (-not $version) { $version = "0.0.0.0" }
+          Write-Host "提取到的版本号: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Build ${{ matrix.cpu }}
+        run: |
+          dotnet restore
+          dotnet publish LunaTV/LunaTV.csproj --self-contained -r osx-${{ matrix.cpu }} -c Release -p:DebugType=None -p:DebugSymbols=false
+      - name: Package app
+        run: |
+          chmod +x package.sh
+          ./package.sh ${{ matrix.cpu }}
+        working-directory: ./script/macos
+      - name: Create DMG
+        run: |
+          create-dmg \
+          --hdiutil-quiet \
+          --icon LunaTV.app 165 175 \
+          --icon-size 120 \
+          --app-drop-link 495 175 \
+          --window-size 660 400 \
+          LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg LunaTV.app
+        working-directory: ./script/macos
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
+          path: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: "v${{ steps.get_version.outputs.version }}"
+          files: script/macos/LunaTV-${{ steps.get_version.outputs.version }}-osx-${{ matrix.cpu }}.dmg
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

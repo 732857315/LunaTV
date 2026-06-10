@@ -34,6 +34,7 @@ public partial class TVDownloadViewModel : ViewModelBase
 
     [ObservableProperty] private int _downloadingCount;
     [ObservableProperty] private string _downloadName = "曼达洛人";
+    [ObservableProperty] private bool _downloadOrHistoryChecked = true;
     [ObservableProperty] private string _downloadUrl = "https://vod.360zyx.vip/20250708/7T2xjBRd/index.m3u8";
     private bool _isInitialized;
 
@@ -45,15 +46,21 @@ public partial class TVDownloadViewModel : ViewModelBase
         _mediaDownloadTable = App.Services.GetRequiredService<SugarRepository<MediaDownload>>();
         MediaDownloadViewModels = new ObservableCollection<MediaDownloadViewModel>();
         FilteredDownloadViewModels = new ObservableCollection<MediaDownloadViewModel>();
+        MediaHistoryViewModels = new ObservableCollection<MediaDownloadViewModel>();
         _downloadTimer = new DispatcherTimer
             (TimeSpan.FromSeconds(1), DispatcherPriority.Background, DownloadTimerOnTick);
         _downloadTimer.Start();
-        Dispatcher.UIThread.InvokeAsync(async () => { await LoadDownloadTasksFromDBAsync(); });
+        Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await LoadDownloadTasksFromDBAsync();
+            await LoadDownloadHistoryFromDbAsync();
+        });
     }
 
     public ObservableCollection<MediaDownloadViewModel> MediaDownloadViewModels { get; set; }
     public ObservableCollection<MediaDownloadViewModel> FilteredDownloadViewModels { get; set; }
     [ObservableProperty] private string? _downloadFilterText;
+    public ObservableCollection<MediaDownloadViewModel> MediaHistoryViewModels { get; set; }
 
     partial void OnDownloadFilterTextChanged(string? value)
     {
@@ -150,6 +157,29 @@ public partial class TVDownloadViewModel : ViewModelBase
         }
     }
 
+    private async Task LoadDownloadHistoryFromDbAsync()
+    {
+        var downloads = await _mediaDownloadTable.GetListAsync(x => x.IsDownloaded);
+        MediaHistoryViewModels.Clear();
+        foreach (var download in downloads)
+        {
+            MediaHistoryViewModels.Add(new MediaDownloadViewModel
+            {
+                Id = download.Id,
+                Name = download.Name,
+                Episode = download.Episode,
+                Url = download.Url,
+                DownloadStatus = DownloadType.None,
+                LocalPath = download.LocalPath,
+                Status = string.IsNullOrEmpty(DownloadFileResolver.GetMediaPath(download.LocalPath, download.Name))
+                    ? StatusWord.DownloadFailed
+                    : StatusWord.Downloaded,
+                Progress = 100,
+                UpdateTime = download.UpdateTime
+            });
+        }
+    }
+
     private async void DownloadTimerOnTick(object? sender, EventArgs e)
     {
         if (!_isInitialized || !File.Exists(GlobalDefine.FFmpegPath))
@@ -173,6 +203,7 @@ public partial class TVDownloadViewModel : ViewModelBase
                         MediaDownloadViewModels.FirstOrDefault(x => x.DownloadStatus == DownloadType.None);
                     if (_currentDownloadingMVM != null)
                     {
+                        Console.WriteLine($"开始下载：{_currentDownloadingMVM.Name}");
                         PreDownload(_currentDownloadingMVM);
                     }
                 }
@@ -373,15 +404,15 @@ public partial class TVDownloadViewModel : ViewModelBase
         if (_downloadManagers[mdvm.Id].DownloadStatus.Count > 0)
         {
             var downloadStatus = _downloadManagers[mdvm.Id].DownloadStatus[0];
-            mdvm.Speed = downloadStatus.speed;
-            mdvm.SizeStr = downloadStatus.sizeStr;
-            mdvm.Progress = downloadStatus.percentage;
-            mdvm.RemainingTime = downloadStatus.remainingTimeStr;
-            mdvm.DownloadedBytes = downloadStatus.size;
-            mdvm.TotalBytes = downloadStatus.totalSize;
-            if (downloadStatus.downloadType != DownloadType.None)
+            mdvm.Speed = downloadStatus.Speed;
+            mdvm.SizeStr = downloadStatus.SizeStr;
+            mdvm.Progress = downloadStatus.Percentage;
+            mdvm.RemainingTime = downloadStatus.RemainingTimeStr;
+            mdvm.DownloadedBytes = downloadStatus.Size;
+            mdvm.TotalBytes = downloadStatus.TotalSize;
+            if (downloadStatus.DownloadType != DownloadType.None)
             {
-                mdvm.DownloadStatus = downloadStatus.downloadType;
+                mdvm.DownloadStatus = downloadStatus.DownloadType;
                 mdvm.OutputFilePath = ResolveOutputFilePath(downloadStatus, mdvm);
 
                 if (mdvm.DownloadStatus == DownloadType.Downloaded)
@@ -463,13 +494,13 @@ public partial class TVDownloadViewModel : ViewModelBase
     {
         var resolvedFilePath = DownloadFileResolver.ResolveExistingFile(
             null,
-            downloadStatus.saveDir,
-            downloadStatus.name,
+            downloadStatus.SaveDir,
+            downloadStatus.Name,
             mediaDownload.Episode);
         if (!string.IsNullOrWhiteSpace(resolvedFilePath)) return resolvedFilePath;
 
-        if (string.IsNullOrWhiteSpace(downloadStatus.saveDir) || string.IsNullOrWhiteSpace(downloadStatus.name)) return mediaDownload.OutputFilePath;
-        return Path.Combine(downloadStatus.saveDir, downloadStatus.name);
+        if (string.IsNullOrWhiteSpace(downloadStatus.SaveDir) || string.IsNullOrWhiteSpace(downloadStatus.Name)) return mediaDownload.OutputFilePath;
+        return Path.Combine(downloadStatus.SaveDir, downloadStatus.Name);
     }
 
     private void AddDownloadCounts(DownloadType downloadStatus)
@@ -536,6 +567,34 @@ public partial class TVDownloadViewModel : ViewModelBase
         // 外部资源下载
         await AddMediaDownload(DownloadName, DownloadUrl);
     }
+
+    [RelayCommand]
+    private async Task SwitchDownloadOrHistory(string tag)
+    {
+        if (tag != "历史") return;
+
+        await LoadDownloadHistoryFromDbAsync();
+    }
+
+    [RelayCommand]
+    private async void DeleteFromDbAsync(int id)
+    {
+        var history = MediaHistoryViewModels.FirstOrDefault(x => x.Id == id);
+        if (history == null) return;
+
+        // 遍历文件夹
+        var files = Directory.GetFiles(history.LocalPath, "*.mp4", SearchOption.TopDirectoryOnly);
+        foreach (var file in files)
+        {
+            if (Path.GetFileName(file).StartsWith(history.Name))
+            {
+                File.Delete(file);
+            }
+        }
+
+        await _mediaDownloadTable.DeleteByIdAsync(id);
+        MediaHistoryViewModels.Remove(history);
+    }
 }
 
 public partial class MediaDownloadViewModel : ObservableObject
@@ -574,6 +633,9 @@ public partial class MediaDownloadViewModel : ObservableObject
 
         OutputFilePath = filePath;
 
+        // 查找同目录下所有可播放文件，构建剧集列表
+        var episodes = BuildLocalEpisodes(filePath);
+
         var win = new MpvPlayerWindow();
         (App.VisualRoot as MainWindow)?.Hide();
         win.Show();
@@ -583,17 +645,7 @@ public partial class MediaDownloadViewModel : ObservableObject
             var episode = string.IsNullOrWhiteSpace(Episode) ? title : Episode;
             videoModel.MediaUrl = filePath;
             videoModel.Title = MpvPlayerWindowModel.BuildPlayerTitle(title, episode);
-            videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>
-            {
-                new()
-                {
-                    Name = episode,
-                    Url = filePath,
-                    OutputFilePath = filePath,
-                    IsDownloaded = true,
-                    Watched = true
-                }
-            };
+            videoModel.Episodes = new ObservableCollection<EpisodeSubjectItem>(episodes);
             videoModel.ViewHistory = new ViewHistory
             {
                 VodId = filePath,
@@ -604,10 +656,59 @@ public partial class MediaDownloadViewModel : ObservableObject
                 Cover = Cover,
                 PlaybackPosition = 0,
                 Duration = 0,
-                TotalEpisodeCount = 1,
+                TotalEpisodeCount = episodes.Count,
                 IsLocal = true
             };
         }
+    }
+
+    private List<EpisodeSubjectItem> BuildLocalEpisodes(string currentFilePath)
+    {
+        var directory = Path.GetDirectoryName(currentFilePath);
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            return
+            [
+                new EpisodeSubjectItem
+                {
+                    Name = Path.GetFileNameWithoutExtension(currentFilePath),
+                    Url = currentFilePath,
+                    OutputFilePath = currentFilePath,
+                    IsDownloaded = true,
+                    Watched = true
+                }
+            ];
+        }
+
+        var playableExtensions = new[] { ".mp4", ".mkv", ".ts", ".m4v", ".mov", ".avi", ".flv", ".wmv", ".webm" };
+        var files = Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly)
+            .Where(f => playableExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (files.Count <= 1)
+        {
+            return
+            [
+                new EpisodeSubjectItem
+                {
+                    Name = Path.GetFileNameWithoutExtension(currentFilePath),
+                    Url = currentFilePath,
+                    OutputFilePath = currentFilePath,
+                    IsDownloaded = true,
+                    Watched = true
+                }
+            ];
+        }
+
+        return files.Select(f => new EpisodeSubjectItem
+        {
+            Name = Path.GetFileNameWithoutExtension(f),
+            Url = f,
+            OutputFilePath = f,
+            IsDownloaded = true,
+            Watched = string.Equals(f, currentFilePath, StringComparison.OrdinalIgnoreCase)
+        }).ToList();
     }
 
     [RelayCommand]
@@ -684,6 +785,17 @@ public static class DownloadFileResolver
         if (!string.IsNullOrWhiteSpace(episode) && fileName.Contains(episode, StringComparison.OrdinalIgnoreCase)) score += 3;
         return score;
     }
+
+    public static string? GetMediaPath(string localPath, string name)
+    {
+        if (string.IsNullOrEmpty(localPath)) return null;
+        // 遍历文件夹
+        var files = Directory.GetFiles(localPath, "*.mp4", SearchOption.TopDirectoryOnly);
+        var match = files.FirstOrDefault(file =>
+            Path.GetFileName(file).StartsWith(name));
+        return match;
+    }
+
 }
 
 internal static class StatusWord

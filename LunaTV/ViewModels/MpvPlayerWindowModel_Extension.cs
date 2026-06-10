@@ -17,9 +17,9 @@ namespace LunaTV.ViewModels;
 public partial class MpvPlayerWindowModel
 {
     private AppJsonConfig? _appJsonConfig;
+    [ObservableProperty] private ObservableCollection<EpisodeSubjectItem> _episodes;
     private SugarRepository<ViewHistory> _viewHistoryTable;
     public ViewHistory? ViewHistory { get; set; }
-    [ObservableProperty] private ObservableCollection<EpisodeSubjectItem> _episodes;
 
     private void DbServiceInit()
     {

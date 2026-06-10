@@ -124,7 +124,7 @@ public static class ServiceCollectionExtenstion
     {
         // page view model
         serviceCollection.AddTransient<SettingsViewModel>();
-        serviceCollection.AddTransient<TVShowHistoryViewModel>();
+        serviceCollection.AddSingleton<TVShowHistoryViewModel>();
         serviceCollection.AddSingleton<MainViewModel>();
         serviceCollection.AddSingleton<TVDownloadViewModel>();
     }
@@ -148,7 +148,7 @@ public static class ServiceCollectionExtenstion
             {
                 DataContext = provider.GetRequiredService<SettingsViewModel>()
             });
-        serviceCollection.AddTransient<TVShowHistoryView>(provider =>
+        serviceCollection.AddSingleton<TVShowHistoryView>(provider =>
             new TVShowHistoryView
             {
                 DataContext = provider.GetRequiredService<TVShowHistoryViewModel>()
