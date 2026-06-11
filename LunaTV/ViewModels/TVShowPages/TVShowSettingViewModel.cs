@@ -381,8 +381,14 @@ public partial class TVShowSettingViewModel : ViewModelBase
 
 
         var result =
+#if ANDROID
+            // Dialogs don't work on Android single-view mode; skip for now
+            DialogResult.None;
+        App.Notification?.Show(new Notification("提示", "该功能请在桌面版操作", NotificationType.Information));
+#else
             await Dialog.ShowModal<TVShowAddCustomApiView, TVShowAddCustomApiViewModel>(addCustomApiViewModel,
                 options: options);
+#endif
         if (result == DialogResult.OK)
         {
             if (addCustomApiViewModel.ApiSourceErrorVisible ||

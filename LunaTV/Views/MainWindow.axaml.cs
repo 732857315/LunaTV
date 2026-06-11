@@ -18,13 +18,17 @@ public partial class MainWindow : UrsaWindow
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
+#if !ANDROID
         if (!e.Cancel) DoubanVerifyWindow.CloseAll();
+#endif
     }
 
     protected override void OnClosed(EventArgs e)
     {
         App.BeginShutdown();
+#if !ANDROID
         DoubanVerifyWindow.CloseAll();
+#endif
         base.OnClosed(e);
     }
 

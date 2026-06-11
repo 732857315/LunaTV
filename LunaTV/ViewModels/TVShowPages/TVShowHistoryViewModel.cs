@@ -113,6 +113,8 @@ public partial class TVShowHistoryViewModel : ViewModelBase
 
     public void RefreshHistoryItems()
     {
+        try
+        {
         _historyItems.Clear();
         var historyItems = _viewHistoryTable.AsQueryable()
             .OrderByDescending(item => item.UpdateTime)
@@ -140,6 +142,11 @@ public partial class TVShowHistoryViewModel : ViewModelBase
             _historyItems.Add(historyItem);
         }
         ApplyHistoryFilter();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] RefreshHistoryItems failed: {ex.Message}");
+        }
     }
 
     [RelayCommand]
@@ -177,6 +184,7 @@ public partial class TVShowHistoryViewModel : ViewModelBase
         var historyItem = _viewHistoryTable.GetById(value.Id);
         if (historyItem == null) return;
 
+#if !ANDROID
         var win = new MpvPlayerWindow();
         (App.VisualRoot as MainWindow)?.Hide();
 
@@ -205,6 +213,11 @@ public partial class TVShowHistoryViewModel : ViewModelBase
                 videoModel.UpdateFromHistory(historyItem.Source, historyItem.VodId, historyItem.Episode);
             }
         }
+#else
+        // Android: play via the video player page
+        var title = $"{historyItem.Name} - {historyItem.Episode}";
+        AndroidVideoPlayerHelper.Play(historyItem.Url, title, historyItem);
+#endif
     }
 }
 

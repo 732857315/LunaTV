@@ -56,7 +56,9 @@ public partial class TVShowHomeViewModel : ViewModelBase
     private bool _refreshMovieCardsAgain;
     private CancellationTokenSource? _pageSizeRefreshDebounceTokenSource;
     private CancellationTokenSource? _naviSearchDebounceCts;
+#if !ANDROID
     private DoubanVerifyWindow? _doubanVerifyWindow;
+#endif
 
     [ObservableProperty] private ObservableCollection<string> _doubanTags;
     private bool _isTagChanged2Refresh; //标签改变的时候要不要更新
@@ -80,9 +82,16 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         _initialized = true;
 
-        _apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
-        var apiSources = _apiSourceTable.GetList();
-        AppConifg.UpdateSites(apiSources);
+        try
+        {
+            _apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
+            var apiSources = _apiSourceTable.GetList();
+            AppConifg.UpdateSites(apiSources);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] TVShowHomeViewModel DB init failed: {ex.Message}");
+        }
     }
 
     partial void OnIsAutoPageSizeChanged(bool value)
@@ -274,6 +283,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     private async Task<string> FetchDoubanSubjectsInternal(string type, string tag, string sort, int limit, int start)
     {
+#if !ANDROID
         if (_doubanVerifyWindow is not null)
         {
             var result = await _doubanVerifyWindow.FetchApiAsync(GetDoubanSubjectsUrl(type, tag, sort, limit, start));
@@ -285,6 +295,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
             throw new InvalidOperationException("豆瓣验证窗口未返回有效数据，请确认验证已完成后再刷新。");
         }
+#endif
 
         return await App.Services.GetRequiredService<IWebApi>()
             .FetchDoubanSubjectsByTag(type, tag, sort, limit, start);
@@ -707,6 +718,11 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     private void OpenDoubanVerifyWindow(bool showNotification)
     {
+#if ANDROID
+        if (showNotification)
+            App.Notification?.Show(new Notification("豆瓣需要验证", "当前平台暂不支持豆瓣验证，请在桌面端完成验证后再继续使用。", NotificationType.Warning));
+        return;
+#else
         var owner = App.VisualRoot as MainWindow;
         if (_doubanVerifyWindow is not null)
         {
@@ -741,6 +757,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
         _doubanVerifyWindow.WaitForVerification();
         _doubanVerifyWindow.Show(owner);
         _doubanVerifyWindow.Activate();
+#endif
     }
 
     partial void OnSelectedTagItemChanged(string? value)
@@ -776,7 +793,13 @@ public partial class TVShowHomeViewModel : ViewModelBase
             StyleClass = ""
         };
 
-        var result = await Dialog.ShowModal<ManageDoubanTagsView, ManageDoubanTagsViewModel>(vm, options: options);
+        var result =
+#if ANDROID
+            DialogResult.None;
+        App.Notification?.Show(new Notification("提示", "请在桌面版管理标签", NotificationType.Information));
+#else
+            await Dialog.ShowModal<ManageDoubanTagsView, ManageDoubanTagsViewModel>(vm, options: options);
+#endif
         if (result == DialogResult.OK)
         {
             var tags = vm.GetTags();
@@ -837,6 +860,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         if (file is { Count: > 0 })
         {
+#if !ANDROID
             var win = new MpvPlayerWindow();
             (App.VisualRoot as MainWindow)?.Hide();
             win.Show();
@@ -859,6 +883,23 @@ public partial class TVShowHomeViewModel : ViewModelBase
                     IsLocal = true
                 };
             }
+#else
+            var localPath = file[0].Path.LocalPath;
+            var title = Path.GetFileName(localPath);
+            var viewHistory = new ViewHistory
+            {
+                VodId = localPath,
+                Name = title,
+                Episode = title,
+                Url = localPath,
+                Source = "本地",
+                PlaybackPosition = 0,
+                Duration = 0,
+                TotalEpisodeCount = 1,
+                IsLocal = true
+            };
+            AndroidVideoPlayerHelper.Play(localPath, title, viewHistory);
+#endif
         }
     }
 
@@ -961,6 +1002,10 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     public async Task Loading()
     {
+#if ANDROID
+        // Dialog.ShowModal creates a Window which isn't supported on Android single-view mode
+        return;
+#else
         var options = new DialogOptions
         {
             Title = "",
@@ -977,6 +1022,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
         _loadingWaitViewModel.TimerStart();
 
         await Dialog.ShowModal<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, options: options);
+#endif
     }
 }
 
@@ -994,8 +1040,12 @@ public partial class MovieCardItem : ViewModelBase
     private void OpenDoubanUrl()
     {
         if (string.IsNullOrWhiteSpace(DoubanUrl)) return;
+#if !ANDROID
         var window = new WebBrowserWindow(DoubanUrl);
         window.Show();
+#else
+        App.Notification?.Show(new Notification("提示", "当前平台暂不支持打开网页", NotificationType.Information));
+#endif
     }
 
     [RelayCommand]

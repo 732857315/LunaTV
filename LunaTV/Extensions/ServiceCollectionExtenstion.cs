@@ -135,8 +135,10 @@ public static class ServiceCollectionExtenstion
     /// <param name="serviceCollection"></param>
     public static void AddViews(this IServiceCollection serviceCollection)
     {
-        // 主窗口
+        // 主窗口 (desktop only — not resolved on Android)
+#if !ANDROID
         serviceCollection.AddSingleton<MainWindow>();
+#endif
         serviceCollection.AddSingleton<MainView>();
         serviceCollection.AddSingleton<TVDownloadView>(provider =>
             new TVDownloadView

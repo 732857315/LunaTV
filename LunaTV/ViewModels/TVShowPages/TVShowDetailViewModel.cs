@@ -121,6 +121,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
 
         Episodes.ForEach(episode => episode.Watched = episode.Name == episodeSubject.Name);
 
+#if !ANDROID
         var win = new MpvPlayerWindow();
         (App.VisualRoot as MainWindow)?.Hide();
         win.Show();
@@ -176,6 +177,56 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
                 };
             }
         }
+#else
+        var mediaUrl2 = DownloadFileResolver.ResolveExistingFile(
+                            episodeSubject.OutputFilePath,
+                            Path.GetDirectoryName(episodeSubject.OutputFilePath ?? string.Empty),
+                            VideoName,
+                            episodeSubject.Name)
+                        ?? episodeSubject.Url;
+        if (string.IsNullOrEmpty(mediaUrl2))
+        {
+            App.Notification?.Show(new Notification("错误", "无法获取播放地址", NotificationType.Error));
+        }
+        else
+        {
+            var cover = string.IsNullOrWhiteSpace(Cover) ? VideoDetail.Cover : Cover;
+            var viewHistory = _viewHistoryTable.GetSingle(his =>
+                his.VodId == VideoDetail.VodId && his.Source == SourceName && his.Name == VideoName);
+            var history = viewHistory is not null
+                ? new ViewHistory
+                {
+                    Id = viewHistory.Id,
+                    VodId = VideoDetail.VodId,
+                    Name = VideoName,
+                    Episode = episodeSubject.Name,
+                    Url = mediaUrl2,
+                    Source = SourceName,
+                    Cover = cover,
+                    PlaybackPosition = viewHistory.Episode == episodeSubject.Name ? viewHistory.PlaybackPosition : 0,
+                    Duration = viewHistory.Episode == episodeSubject.Name ? viewHistory.Duration : 0,
+                    TotalEpisodeCount = VideoDetail.Episodes.Count,
+                    IsLocal = false,
+                    CreateTime = viewHistory.CreateTime
+                }
+                : new ViewHistory
+                {
+                    VodId = VideoDetail.VodId,
+                    Name = VideoName,
+                    Episode = episodeSubject.Name,
+                    Url = mediaUrl2,
+                    Source = SourceName,
+                    Cover = cover,
+                    PlaybackPosition = 0,
+                    Duration = 0,
+                    TotalEpisodeCount = VideoDetail.Episodes.Count,
+                    IsLocal = false
+                };
+
+            var title = $"{VideoName} - {episodeSubject.Name}";
+            AndroidVideoPlayerHelper.Play(mediaUrl2, title, history);
+        }
+#endif
 
         Close();
     }
@@ -224,7 +275,7 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
         {
             if (Episodes.Count > 1)
             {
-                await tvdownloadVm.AddMediaDownload(episode.Name, episode.Url, VideoName, SourceName ?? string.Empty, Cover ?? VideoDetail.Cover);
+                await tvdownloadVm.AddMediaDownload($"{VideoName}-{episode.Name}", episode.Url, VideoName, SourceName ?? string.Empty, Cover ?? VideoDetail.Cover);
             }
             else
             {

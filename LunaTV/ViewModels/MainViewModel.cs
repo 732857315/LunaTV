@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Controls;
@@ -35,66 +36,88 @@ public partial class MainViewModel : ViewModelBase
             new()
             {
                 Name = "首页",
-                Data = App.TopLevel.TryFindResource("SemiIconHome", out var value1) ? (StreamGeometry)value1 : null
+                Data = App.TopLevel?.TryFindResource("SemiIconHome", out var value1) == true ? (StreamGeometry)value1! : null
             },
             new()
             {
                 Name = "搜索",
-                Data = App.TopLevel.TryFindResource("SemiIconSearch", out var value2) ? (StreamGeometry)value2 : null
+                Data = App.TopLevel?.TryFindResource("SemiIconSearch", out var value2) == true ? (StreamGeometry)value2! : null
             },
             // new()
             // {
             //     Name = "筛选",
-            //     Data = App.TopLevel.TryFindResource("SemiIconFilter", out var value3) ? (StreamGeometry)value3 : null,
+            //     Data = App.TopLevel?.TryFindResource("SemiIconFilter", out var value3) == true ? (StreamGeometry)value3! : null,
             // },
             new()
             {
                 Name = "历史",
-                Data = App.TopLevel.TryFindResource("SemiIconHistory", out var value4) ? (StreamGeometry)value4 : null
+                Data = App.TopLevel?.TryFindResource("SemiIconHistory", out var value4) == true ? (StreamGeometry)value4! : null
             },
             new()
             {
                 Name = "下载",
-                Data = App.TopLevel.TryFindResource("SemiIconDownload", out var value5) ? (StreamGeometry)value5 : null
+                Data = App.TopLevel?.TryFindResource("SemiIconDownload", out var value5) == true ? (StreamGeometry)value5! : null
             },
             new()
             {
                 Name = "配置",
-                Data = App.TopLevel.TryFindResource("SemiIconSetting", out var value6) ? (StreamGeometry)value6 : null
+                Data = App.TopLevel?.TryFindResource("SemiIconSetting", out var value6) == true ? (StreamGeometry)value6! : null
             }
         };
 
 
         //初始化配置
-        AppConifg.SelectApis.Clear();
-        var apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
-        var apiSources = apiSourceTable.GetList();
-        AppConifg.SelectApis.Clear();
-        AppConifg.SelectAdultApis.Clear();
-        AppConifg.SelectApis.AddRange(apiSources.Where(api => api.IsEnable && !api.IsAdult).Select(api => api.Source));
-        AppConifg.SelectAdultApis.AddRange(apiSources.Where(api => api.IsEnable && api.IsAdult)
-            .Select(api => api.Source));
-        AppConifg.UpdateSites(apiSources);
-
-        var playerConfigTable = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>();
-        var playerConfig = playerConfigTable.GetSingle(config => config.Id > 0);
-        if (playerConfig is null)
+        try
         {
-            AppConifg.PlayerConfig = new PlayerConfig
+            AppConifg.SelectApis.Clear();
+            var apiSourceTable = App.Services.GetRequiredService<SugarRepository<ApiSource>>();
+            var apiSources = apiSourceTable.GetList();
+            AppConifg.SelectApis.Clear();
+            AppConifg.SelectAdultApis.Clear();
+            AppConifg.SelectApis.AddRange(apiSources.Where(api => api.IsEnable && !api.IsAdult).Select(api => api.Source));
+            AppConifg.SelectAdultApis.AddRange(apiSources.Where(api => api.IsEnable && api.IsAdult)
+                .Select(api => api.Source));
+            AppConifg.UpdateSites(apiSources);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] API config init failed: {ex.Message}");
+        }
+
+        try
+        {
+            var playerConfigTable = App.Services.GetRequiredService<SugarRepository<PlayerConfig>>();
+            var playerConfig = playerConfigTable.GetList(config => config.Id > 0)
+                .OrderByDescending(config => config.Id)
+                .FirstOrDefault();
+            if (playerConfig is null)
             {
-                AdFilteringEnabled = true,
-                DoubanApiEnabled = false,
-                HomeAutoLoadDoubanEnabled = false,
-                ForceApiNeedSpecialSource = false,
-                Timeout = 15000,
-                FilterAds = true,
-                AutoPlayNext = false
-            };
-            playerConfigTable.Insert(AppConifg.PlayerConfig);
+                AppConifg.PlayerConfig = new PlayerConfig
+                {
+                    AdFilteringEnabled = true,
+                    DoubanApiEnabled = false,
+                    HomeAutoLoadDoubanEnabled = false,
+                    ForceApiNeedSpecialSource = false,
+                    Timeout = 15000,
+                    FilterAds = true,
+                    AutoPlayNext = false
+                };
+                playerConfigTable.Insert(AppConifg.PlayerConfig);
         }
         else
         {
             AppConifg.PlayerConfig = playerConfig;
+        }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] PlayerConfig init failed: {ex.Message}");
+            AppConifg.PlayerConfig ??= new PlayerConfig
+            {
+                AdFilteringEnabled = true, DoubanApiEnabled = false,
+                HomeAutoLoadDoubanEnabled = false, ForceApiNeedSpecialSource = false,
+                Timeout = 15000, FilterAds = true, AutoPlayNext = false
+            };
         }
 
         _viewDictionary = new()

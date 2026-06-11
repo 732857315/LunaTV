@@ -22,8 +22,16 @@ public sealed class GlobalDefine
 
     static GlobalDefine()
     {
-        string fileName = OperatingSystem.IsWindows() ? "LunaTV.exe" : "LunaTV";
-        FileVersionInfo app = FileVersionInfo.GetVersionInfo(Path.Combine(RootPath, fileName));
+        try
+        {
+            string fileName = OperatingSystem.IsWindows() ? "LunaTV.exe" : "LunaTV";
+            FileVersionInfo app = FileVersionInfo.GetVersionInfo(Path.Combine(RootPath, fileName));
+        }
+        catch
+        {
+            // FileVersionInfo.GetVersionInfo may fail on platforms where the
+            // executable is not present at RootPath (e.g. Android single-view).
+        }
         EnsureDirectory(BootstrapDataPath);
     }
 
@@ -38,7 +46,7 @@ public sealed class GlobalDefine
     public static string RootPath => AppDomain.CurrentDomain.BaseDirectory;
 
     public static string BootstrapDataPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LunaTV");
+        Path.Combine(GetLocalAppDataPath(), "LunaTV");
 
     public static string DataPath => s_dataPath ?? BootstrapDataPath;
 
@@ -66,8 +74,19 @@ public sealed class GlobalDefine
 
     public static bool UseFrameMode { get; set; } = false;
 
-    private static string DefaultDownloadPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LunaTV");
+    private static string DefaultDownloadPath
+    {
+        get
+        {
+#if ANDROID
+            // On Android, use the app's external files directory for downloads
+            var extDir = global::Android.App.Application.Context.GetExternalFilesDir(null)?.AbsolutePath;
+            return Path.Combine(extDir ?? GetLocalAppDataPath(), "LunaTV");
+#else
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LunaTV");
+#endif
+        }
+    }
 
     public static StoragePathsConfig GetDefaultStoragePaths()
     {
@@ -200,5 +219,23 @@ public sealed class GlobalDefine
             : Environment.OSVersion.Platform == PlatformID.Unix
                 ? PlatformLinux
                 : PlatformWindows;
+    }
+
+    private static string GetLocalAppDataPath()
+    {
+        var path = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrWhiteSpace(path)) return path;
+
+        // Fallback for Android where GetFolderPath may return empty
+        path = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+        if (!string.IsNullOrWhiteSpace(path)) return path;
+
+#if ANDROID
+        // Final fallback: use Android's internal files directory
+        var context = global::Android.App.Application.Context;
+        return context.FilesDir?.AbsolutePath ?? "/data/data/com.lunatv.app/files";
+#else
+        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share");
+#endif
     }
 }

@@ -615,7 +615,17 @@ public partial class TVShowSearchViewModel : ViewModelBase
             };
             await vm.RefreshUiAsync();
 
+#if ANDROID
+            // On Android, show detail as a page instead of a modal dialog
+            var mainViewModel = App.Services.GetRequiredService<MainViewModel>();
+            var prevPage = mainViewModel.PageContent;
+            var detailView = new TVShowDetailView { DataContext = vm };
+            mainViewModel.PageContent = detailView;
+            // The detail view has its own back/close mechanism via IDialogContext.Close()
+            vm.RequestClose += (_, _) => mainViewModel.PageContent = prevPage;
+#else
             await Dialog.ShowModal<TVShowDetailView, TVShowDetailViewModel>(vm, options: options);
+#endif
         }
         catch (OperationCanceledException)
         {
@@ -822,6 +832,9 @@ public partial class TVShowSearchViewModel : ViewModelBase
 
     public async Task Loading()
     {
+#if ANDROID
+        return;
+#else
         var options = new DialogOptions
         {
             Title = "",
@@ -838,5 +851,6 @@ public partial class TVShowSearchViewModel : ViewModelBase
         _loadingWaitViewModel.TimerStart();
 
         await Dialog.ShowModal<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, options: options);
+#endif
     }
 }

@@ -23,7 +23,7 @@ public class App : Application
     public static WindowToastManager? Toast { get; set; }
     public static bool IsShuttingDown { get; private set; }
     public static IStorageProvider? StorageProvider { get; internal set; }
-    public static TopLevel TopLevel => TopLevel.GetTopLevel(VisualRoot)!;
+    public static TopLevel? TopLevel => VisualRoot != null ? TopLevel.GetTopLevel(VisualRoot) : null;
 
     public static IServiceProvider Services => ServiceLocator.Host.Services;
     [NotNull] public static IClipboard? Clipboard { get; internal set; }
@@ -60,12 +60,21 @@ public class App : Application
             var view = ServiceLocator.GetRequiredService<MainView>();
             singleView.MainView = view;
 
-            VisualRoot = view.Parent as MainWindow;
-            StorageProvider = (view.Parent as MainWindow)?.StorageProvider;
-            Clipboard = (view.Parent as MainWindow)?.Clipboard ?? throw new NullReferenceException("Clipboard is null");
+            VisualRoot = view;
 
-            Notification = new WindowNotificationManager(TopLevel);
-            Toast = new WindowToastManager(TopLevel);
+            // On single-view platforms (Android, iOS) there is no MainWindow.
+            // TopLevel is only available once the view is attached to the visual tree,
+            // so we defer StorageProvider / Clipboard / Notification initialization.
+            view.AttachedToVisualTree += (_, _) =>
+            {
+                var topLevel = TopLevel.GetTopLevel(view);
+                if (topLevel is null) return;
+
+                StorageProvider = topLevel.StorageProvider;
+                Clipboard = topLevel.Clipboard;
+                Notification = new WindowNotificationManager(topLevel);
+                Toast = new WindowToastManager(topLevel);
+            };
         }
 
         // Notification.Position = NotificationPosition.BottomRight;
@@ -89,8 +98,12 @@ public class App : Application
 
         try
         {
+#if !ANDROID
             var win = new CrashWindow(e.Exception.ToString());
             win.Show();
+#else
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] Unhandled UI exception: {e.Exception}");
+#endif
         }
         finally
         {
@@ -105,8 +118,12 @@ public class App : Application
 
         try
         {
+#if !ANDROID
             var win = new CrashWindow(e.ToString() ?? "Unhandled Exception");
             win.Show();
+#else
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] Unhandled domain exception: {e}");
+#endif
         }
         catch
         {

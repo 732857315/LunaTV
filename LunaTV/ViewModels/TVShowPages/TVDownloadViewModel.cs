@@ -633,6 +633,7 @@ public partial class MediaDownloadViewModel : ObservableObject
 
         OutputFilePath = filePath;
 
+#if !ANDROID
         // 查找同目录下所有可播放文件，构建剧集列表
         var episodes = BuildLocalEpisodes(filePath);
 
@@ -660,6 +661,24 @@ public partial class MediaDownloadViewModel : ObservableObject
                 IsLocal = true
             };
         }
+#else
+        var title2 = string.IsNullOrWhiteSpace(Name) ? Path.GetFileName(filePath) : Name;
+        var episode2 = string.IsNullOrWhiteSpace(Episode) ? title2 : Episode;
+        var viewHistory2 = new ViewHistory
+        {
+            VodId = filePath,
+            Name = title2,
+            Episode = episode2,
+            Url = filePath,
+            Source = string.IsNullOrWhiteSpace(Source) ? "下载" : Source,
+            Cover = Cover,
+            PlaybackPosition = 0,
+            Duration = 0,
+            TotalEpisodeCount = 1,
+            IsLocal = true
+        };
+        AndroidVideoPlayerHelper.Play(filePath, $"{title2} - {episode2}", viewHistory2);
+#endif
     }
 
     private List<EpisodeSubjectItem> BuildLocalEpisodes(string currentFilePath)
@@ -718,6 +737,11 @@ public partial class MediaDownloadViewModel : ObservableObject
 
         try
         {
+#if ANDROID
+            // On Android, opening a folder via file manager is not straightforward;
+            // show a notification with the path instead.
+            App.Notification?.Show(new Notification("下载路径", LocalPath, NotificationType.Information));
+#else
             if (OperatingSystem.IsWindows())
             {
                 Process.Start("explorer.exe", LocalPath);
@@ -726,6 +750,7 @@ public partial class MediaDownloadViewModel : ObservableObject
             {
                 Process.Start("open", LocalPath);
             }
+#endif
         }
         catch (Exception ex)
         {
