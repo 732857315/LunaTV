@@ -149,24 +149,29 @@ public class App : Application
     {
         try
         {
-            var ffmpegDir = System.IO.Path.Combine(GlobalDefine.DataPath, "bin");
-            var ffmpegPath = System.IO.Path.Combine(ffmpegDir, "ffmpeg");
+            // Android extracts native libraries to the app's nativeLibraryDir
+            var context = global::Android.App.Application.Context;
+            var nativeLibDir = context.ApplicationInfo?.NativeLibraryDir;
+            if (string.IsNullOrEmpty(nativeLibDir)) return;
 
-            if (!System.IO.File.Exists(ffmpegPath))
+            var ffmpegInLib = System.IO.Path.Combine(nativeLibDir, "libffmpeg.so");
+            if (System.IO.File.Exists(ffmpegInLib))
             {
-                if (!System.IO.Directory.Exists(ffmpegDir))
-                    System.IO.Directory.CreateDirectory(ffmpegDir);
+                // Copy to a non-.so name so Process.Start can execute it
+                var ffmpegDir = System.IO.Path.Combine(GlobalDefine.DataPath, "bin");
+                var ffmpegPath = System.IO.Path.Combine(ffmpegDir, "ffmpeg");
 
-                // Extract ffmpeg from APK assets
-                var context = global::Android.App.Application.Context;
-                using var input = context.Assets!.Open("ffmpeg_arm64");
-                using var output = System.IO.File.Create(ffmpegPath);
-                input.CopyTo(output);
+                if (!System.IO.File.Exists(ffmpegPath))
+                {
+                    if (!System.IO.Directory.Exists(ffmpegDir))
+                        System.IO.Directory.CreateDirectory(ffmpegDir);
+                    System.IO.File.Copy(ffmpegInLib, ffmpegPath, true);
+                }
+
+                // Ensure executable
+                try { Java.Lang.Runtime.GetRuntime().Exec($"chmod 755 {ffmpegPath}")?.WaitFor(); } catch { }
+                GlobalDefine.FFmpegPath = ffmpegPath;
             }
-
-            // Make executable (chmod +x)
-            Java.Lang.Runtime.GetRuntime().Exec($"chmod 755 {ffmpegPath}")?.WaitFor();
-            GlobalDefine.FFmpegPath = ffmpegPath;
         }
         catch (System.Exception ex)
         {
