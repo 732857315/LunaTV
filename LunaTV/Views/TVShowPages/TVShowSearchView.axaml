@@ -81,7 +81,8 @@
         <ItemsControl
             Grid.Row="2"
             ItemsSource="{Binding HistoryMovies}"
-            Width="600">
+            MaxWidth="600"
+            HorizontalAlignment="Stretch">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel ItemSpacing="4" Orientation="Horizontal" />
