@@ -150,11 +150,13 @@ public partial class TVDownloadViewModel : ViewModelBase
 
         RefreshFilteredDownloads();
         _isInitialized = true;
+#if !ANDROID
         if (!File.Exists(GlobalDefine.FFmpegPath))
         {
             App.Notification?.Show(new Notification("错误", "FFmpeg路径配置错误", NotificationType.Error),
                 NotificationType.Error);
         }
+#endif
     }
 
     private async Task LoadDownloadHistoryFromDbAsync()
@@ -182,10 +184,14 @@ public partial class TVDownloadViewModel : ViewModelBase
 
     private async void DownloadTimerOnTick(object? sender, EventArgs e)
     {
+#if ANDROID
+        if (!_isInitialized) return;
+#else
         if (!_isInitialized || !File.Exists(GlobalDefine.FFmpegPath))
         {
             return;
         }
+#endif
 
         try
         {
@@ -273,8 +279,13 @@ public partial class TVDownloadViewModel : ViewModelBase
 
         if (!File.Exists(GlobalDefine.FFmpegPath))
         {
+#if ANDROID
+            App.Notification?.Show(new Notification("提示", "Android暂不支持下载功能", NotificationType.Information),
+                NotificationType.Information);
+#else
             App.Notification?.Show(new Notification("错误", "FFmpeg路径配置错误", NotificationType.Error),
                 NotificationType.Error);
+#endif
             return;
         }
 

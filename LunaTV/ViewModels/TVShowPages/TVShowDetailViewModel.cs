@@ -260,6 +260,11 @@ public partial class TVShowDetailViewModel : ViewModelBase, IDialogContext
     [RelayCommand]
     private async Task DownloadSelected()
     {
+#if ANDROID
+        App.Notification?.Show(new Notification("提示", "Android暂不支持下载功能", NotificationType.Information),
+            NotificationType.Information);
+        return;
+#endif
         if (!File.Exists(GlobalDefine.FFmpegPath))
         {
             App.Notification?.Show(new Notification("错误", "FFmpeg路径配置错误", NotificationType.Error),

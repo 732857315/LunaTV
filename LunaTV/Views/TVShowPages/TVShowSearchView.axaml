@@ -22,7 +22,8 @@
             Margin="0,30,0,0"
             Text="{Binding InputMovieTvName}"
             Watermark="搜索影视..."
-            Width="400">
+            MaxWidth="600"
+            HorizontalAlignment="Stretch">
             <TextBox.KeyBindings>
                 <KeyBinding
                     Command="{Binding SearchCommand}"
@@ -60,8 +61,8 @@
 
         <DockPanel
             Grid.Row="1"
-            HorizontalAlignment="Center"
-            Width="400">
+            HorizontalAlignment="Stretch"
+            MaxWidth="600">
             <TextBlock
                 Classes="Tertiary Small"
                 DockPanel.Dock="Left"

@@ -32,6 +32,15 @@ public class App : Application
     {
         AvaloniaXamlLoader.Load(this);
         RequestedThemeVariant = ThemeVariant.Dark;
+
+#if ANDROID
+        // Load Android-specific styles for mobile UI adaptation
+        var androidStyles = new Avalonia.Markup.Xaml.Styling.StyleInclude(new Uri("avares://LunaTV"))
+        {
+            Source = new Uri("/Styles/AndroidStyle.axaml", UriKind.Relative)
+        };
+        Styles.Add(androidStyles);
+#endif
     }
 
     public override void OnFrameworkInitializationCompleted()
