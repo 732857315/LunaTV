@@ -66,6 +66,10 @@ public class App : Application
         }
         else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
         {
+#if ANDROID
+            // Extract ffmpeg binary from assets on first run
+            InitAndroidFfmpeg();
+#endif
             var view = ServiceLocator.GetRequiredService<MainView>();
             singleView.MainView = view;
 
@@ -139,4 +143,35 @@ public class App : Application
             // ignored
         }
     }
+
+#if ANDROID
+    private static void InitAndroidFfmpeg()
+    {
+        try
+        {
+            var ffmpegDir = System.IO.Path.Combine(GlobalDefine.DataPath, "bin");
+            var ffmpegPath = System.IO.Path.Combine(ffmpegDir, "ffmpeg");
+
+            if (!System.IO.File.Exists(ffmpegPath))
+            {
+                if (!System.IO.Directory.Exists(ffmpegDir))
+                    System.IO.Directory.CreateDirectory(ffmpegDir);
+
+                // Extract ffmpeg from APK assets
+                var context = global::Android.App.Application.Context;
+                using var input = context.Assets!.Open("ffmpeg_arm64");
+                using var output = System.IO.File.Create(ffmpegPath);
+                input.CopyTo(output);
+            }
+
+            // Make executable (chmod +x)
+            Java.Lang.Runtime.GetRuntime().Exec($"chmod 755 {ffmpegPath}")?.WaitFor();
+            GlobalDefine.FFmpegPath = ffmpegPath;
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[LunaTV] InitAndroidFfmpeg failed: {ex.Message}");
+        }
+    }
+#endif
 }

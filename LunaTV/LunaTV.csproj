@@ -112,6 +112,7 @@
     <!-- Android resources (styles.xml etc.) -->
     <ItemGroup Condition="'$(TargetFramework)'=='net10.0-android'">
         <AndroidResource Include="Android\Resources\**\*"/>
+        <AndroidAsset Include="Android\Assets\ffmpeg_arm64" />
     </ItemGroup>
 
     <!-- Android native libraries (mpv + ffmpeg) -->

@@ -382,9 +382,8 @@ public partial class TVShowSettingViewModel : ViewModelBase
 
         var result =
 #if ANDROID
-            // Dialogs don't work on Android single-view mode; skip for now
-            DialogResult.None;
-        App.Notification?.Show(new Notification("提示", "该功能请在桌面版操作", NotificationType.Information));
+            // On Android, show the add-API view as a page navigation
+            await ShowAddApiViewAsPage(addCustomApiViewModel);
 #else
             await Dialog.ShowModal<TVShowAddCustomApiView, TVShowAddCustomApiViewModel>(addCustomApiViewModel,
                 options: options);
@@ -575,6 +574,46 @@ public partial class TVShowSettingViewModel : ViewModelBase
         AppConifg.PlayerConfig.ForceApiNeedSpecialSource = value;
         SavePlayerConfig();
     }
+
+#if ANDROID
+    private async Task<DialogResult> ShowAddApiViewAsPage(TVShowAddCustomApiViewModel vm)
+    {
+        // On Android, show as a simple page overlay with a confirm action
+        // Since we can't do proper modal flow, show the view and wait
+        var mainViewModel = App.Services.GetRequiredService<MainViewModel>();
+        var prevPage = mainViewModel.PageContent;
+
+        var view = new LunaTV.Views.TVShowPages.TVShowAddCustomApiView { DataContext = vm };
+
+        // Wrap in a panel with confirm/cancel buttons
+        var panel = new Avalonia.Controls.StackPanel();
+        var btnPanel = new Avalonia.Controls.StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            Margin = new Avalonia.Thickness(0, 10),
+            Spacing = 20
+        };
+
+        var tcs = new TaskCompletionSource<DialogResult>();
+        var confirmBtn = new Avalonia.Controls.Button { Content = "确认添加", MinWidth = 100 };
+        var cancelBtn = new Avalonia.Controls.Button { Content = "取消", MinWidth = 100 };
+        confirmBtn.Click += (_, _) => { mainViewModel.PageContent = prevPage; tcs.TrySetResult(DialogResult.OK); };
+        cancelBtn.Click += (_, _) => { mainViewModel.PageContent = prevPage; tcs.TrySetResult(DialogResult.None); };
+        btnPanel.Children.Add(confirmBtn);
+        btnPanel.Children.Add(cancelBtn);
+
+        panel.Children.Add(view);
+        panel.Children.Add(btnPanel);
+        var wrapper = new Avalonia.Controls.UserControl
+        {
+            Content = new Avalonia.Controls.ScrollViewer { Content = panel, Padding = new Avalonia.Thickness(20) }
+        };
+        mainViewModel.PageContent = wrapper;
+
+        return await tcs.Task;
+    }
+#endif
 }
 
 public partial class ApiSourceItem : ObservableObject

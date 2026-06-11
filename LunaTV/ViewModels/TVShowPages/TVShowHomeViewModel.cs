@@ -796,7 +796,8 @@ public partial class TVShowHomeViewModel : ViewModelBase
         var result =
 #if ANDROID
             DialogResult.None;
-        App.Notification?.Show(new Notification("提示", "请在桌面版管理标签", NotificationType.Information));
+        // ManageTags dialog not critical for mobile - show notification
+        App.Notification?.Show(new Notification("提示", "标签管理功能开发中", NotificationType.Information));
 #else
             await Dialog.ShowModal<ManageDoubanTagsView, ManageDoubanTagsViewModel>(vm, options: options);
 #endif
