@@ -65,6 +65,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
     [ObservableProperty] private ObservableCollection<MovieCardItem> _movieCardItems;
     [ObservableProperty] private bool _movieChecked = true;
+    [ObservableProperty] private bool _isLoading;
     private int _pageStart;
     [ObservableProperty] private bool _isAutoPageSize = true;
     [ObservableProperty] private int _manualPageSize = 16;
@@ -644,6 +645,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
                 if (!loadingClosed && MovieCardItems.Count > 0)
                 {
                     _loadingWaitViewModel.Close();
+                    IsLoading = false;
                     loadingClosed = true;
                 }
             });
@@ -693,6 +695,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         if (_initialized)
             _loadingWaitViewModel.Close();
+        IsLoading = false;
         _isTagChanged2Refresh = true;
     }
 
@@ -719,8 +722,20 @@ public partial class TVShowHomeViewModel : ViewModelBase
     private void OpenDoubanVerifyWindow(bool showNotification)
     {
 #if ANDROID
-        if (showNotification)
-            App.Notification?.Show(new Notification("豆瓣需要验证", "当前平台暂不支持豆瓣验证，请在桌面端完成验证后再继续使用。", NotificationType.Warning));
+        try
+        {
+            var uri = global::Android.Net.Uri.Parse("https://movie.douban.com/");
+            var intent = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView, uri);
+            intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+            global::Android.App.Application.Context.StartActivity(intent);
+            if (showNotification)
+                App.Notification?.Show(new Notification("豆瓣需要验证", "已在系统浏览器中打开豆瓣，完成验证后返回应用即可。", NotificationType.Warning));
+        }
+        catch (Exception ex)
+        {
+            if (showNotification)
+                App.Notification?.Show(new Notification("豆瓣需要验证", $"打开浏览器失败: {ex.Message}", NotificationType.Error));
+        }
         return;
 #else
         var owner = App.VisualRoot as MainWindow;
@@ -795,9 +810,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
 
         var result =
 #if ANDROID
-            DialogResult.None;
-        // ManageTags dialog not critical for mobile - show notification
-        App.Notification?.Show(new Notification("提示", "标签管理功能开发中", NotificationType.Information));
+            await ShowManageTagsAsPage(vm);
 #else
             await Dialog.ShowModal<ManageDoubanTagsView, ManageDoubanTagsViewModel>(vm, options: options);
 #endif
@@ -998,6 +1011,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
         finally
         {
             _loadingWaitViewModel.Close();
+            IsLoading = false;
         }
     }
 
@@ -1005,6 +1019,7 @@ public partial class TVShowHomeViewModel : ViewModelBase
     {
 #if ANDROID
         // Dialog.ShowModal creates a Window which isn't supported on Android single-view mode
+        IsLoading = true;
         return;
 #else
         var options = new DialogOptions
@@ -1025,6 +1040,43 @@ public partial class TVShowHomeViewModel : ViewModelBase
         await Dialog.ShowModal<LoadingWaitView, LoadingWaitViewModel>(_loadingWaitViewModel, options: options);
 #endif
     }
+
+#if ANDROID
+    private async Task<DialogResult> ShowManageTagsAsPage(ManageDoubanTagsViewModel vm)
+    {
+        var mainViewModel = App.Services.GetRequiredService<MainViewModel>();
+        var prevPage = mainViewModel.PageContent;
+
+        var view = new ManageDoubanTagsView { DataContext = vm };
+
+        var panel = new Avalonia.Controls.StackPanel();
+        var btnPanel = new Avalonia.Controls.StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            Margin = new Avalonia.Thickness(0, 10),
+            Spacing = 20
+        };
+
+        var tcs = new TaskCompletionSource<DialogResult>();
+        var confirmBtn = new Avalonia.Controls.Button { Content = "确认", MinWidth = 100 };
+        var cancelBtn = new Avalonia.Controls.Button { Content = "取消", MinWidth = 100 };
+        confirmBtn.Click += (_, _) => { mainViewModel.PageContent = prevPage; tcs.TrySetResult(DialogResult.OK); };
+        cancelBtn.Click += (_, _) => { mainViewModel.PageContent = prevPage; tcs.TrySetResult(DialogResult.None); };
+        btnPanel.Children.Add(confirmBtn);
+        btnPanel.Children.Add(cancelBtn);
+
+        panel.Children.Add(view);
+        panel.Children.Add(btnPanel);
+        var wrapper = new Avalonia.Controls.UserControl
+        {
+            Content = new Avalonia.Controls.ScrollViewer { Content = panel, Padding = new Avalonia.Thickness(20) }
+        };
+        mainViewModel.PageContent = wrapper;
+
+        return await tcs.Task;
+    }
+#endif
 }
 
 public partial class MovieCardItem : ViewModelBase
@@ -1045,7 +1097,17 @@ public partial class MovieCardItem : ViewModelBase
         var window = new WebBrowserWindow(DoubanUrl);
         window.Show();
 #else
-        App.Notification?.Show(new Notification("提示", "当前平台暂不支持打开网页", NotificationType.Information));
+        try
+        {
+            var uri = global::Android.Net.Uri.Parse(DoubanUrl);
+            var intent = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView, uri);
+            intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+            global::Android.App.Application.Context.StartActivity(intent);
+        }
+        catch (Exception ex)
+        {
+            App.Notification?.Show(new Notification("提示", $"打开浏览器失败: {ex.Message}", NotificationType.Error));
+        }
 #endif
     }
 

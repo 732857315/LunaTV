@@ -25,6 +25,13 @@ public partial class AndroidVideoPlayerView : UserControl
     private ViewHistory? _viewHistory;
     private Action? _onClose;
 
+    // Speed control
+    private static readonly double[] _speeds = { 0.5, 0.75, 1.0, 1.25, 1.5, 2.0 };
+    private int _currentSpeedIndex = 2; // Default 1.0x
+
+    // Volume control
+    private double _currentVolume = 100;
+
     public AndroidVideoPlayerView()
     {
         InitializeComponent();
@@ -37,6 +44,9 @@ public partial class AndroidVideoPlayerView : UserControl
         BackButton.Click += OnBackClick;
         PlayPauseButton.Click += OnPlayPauseClick;
         SeekSlider.PropertyChanged += OnSeekSliderChanged;
+        SpeedButton.Click += OnSpeedClick;
+        VolumeDownButton.Click += OnVolumeDownClick;
+        VolumeUpButton.Click += OnVolumeUpClick;
 
         // Tap anywhere on the video to toggle controls
         PointerPressed += OnVideoTapped;
@@ -199,6 +209,30 @@ public partial class AndroidVideoPlayerView : UserControl
         SaveHistory();
         _mpv?.Stop();
         _onClose?.Invoke();
+    }
+
+    private void OnSpeedClick(object? sender, RoutedEventArgs e)
+    {
+        if (_mpv == null) return;
+
+        _currentSpeedIndex = (_currentSpeedIndex + 1) % _speeds.Length;
+        var newSpeed = _speeds[_currentSpeedIndex];
+        _mpv.Speed.Set(newSpeed);
+        SpeedButton.Content = $"{newSpeed:F2}x";
+    }
+
+    private void OnVolumeDownClick(object? sender, RoutedEventArgs e)
+    {
+        if (_mpv == null) return;
+        _currentVolume = Math.Max(0, _currentVolume - 10);
+        _mpv.Volume.Set(_currentVolume);
+    }
+
+    private void OnVolumeUpClick(object? sender, RoutedEventArgs e)
+    {
+        if (_mpv == null) return;
+        _currentVolume = Math.Min(100, _currentVolume + 10);
+        _mpv.Volume.Set(_currentVolume);
     }
 
     private void SaveHistory()

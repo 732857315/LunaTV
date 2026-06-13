@@ -23,11 +23,4 @@
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
     </ItemGroup>
-
-    <!-- Android native libraries (arm64-v8a) -->
-    <ItemGroup Condition="'$(TargetFramework)'=='net10.0-android'">
-        <AndroidNativeLibrary Include="android-arm64\*.so">
-            <Abi>arm64-v8a</Abi>
-        </AndroidNativeLibrary>
-    </ItemGroup>
 </Project>

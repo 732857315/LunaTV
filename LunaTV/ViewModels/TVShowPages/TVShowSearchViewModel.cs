@@ -637,6 +637,9 @@ public partial class TVShowSearchViewModel : ViewModelBase
         finally
         {
             _loadingWaitViewModel.Close();
+#if ANDROID
+            IsSearching = false;
+#endif
         }
     }
 
@@ -833,6 +836,7 @@ public partial class TVShowSearchViewModel : ViewModelBase
     public async Task Loading()
     {
 #if ANDROID
+        IsSearching = true;
         return;
 #else
         var options = new DialogOptions

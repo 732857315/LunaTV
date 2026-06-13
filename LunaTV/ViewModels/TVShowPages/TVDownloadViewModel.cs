@@ -744,9 +744,40 @@ public partial class MediaDownloadViewModel : ObservableObject
         try
         {
 #if ANDROID
-            // On Android, opening a folder via file manager is not straightforward;
-            // show a notification with the path instead.
-            App.Notification?.Show(new Notification("下载路径", LocalPath, NotificationType.Information));
+            try
+            {
+                var encodedPath = global::Android.Net.Uri.Encode(LocalPath);
+                var uri = global::Android.Net.Uri.Parse($"content://com.android.externalstorage.documents/document/primary:{encodedPath}");
+                var intent = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
+                intent.SetDataAndType(uri, "resource/folder");
+                intent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+                intent.AddFlags(global::Android.Content.ActivityFlags.GrantReadUriPermission);
+                try
+                {
+                    global::Android.App.Application.Context.StartActivity(intent);
+                }
+                catch
+                {
+                    // Fallback: try with generic file manager
+                    var fallbackIntent = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
+                    fallbackIntent.SetDataAndType(global::Android.Net.Uri.Parse("file://" + LocalPath), "*/*");
+                    fallbackIntent.AddFlags(global::Android.Content.ActivityFlags.NewTask);
+                    try
+                    {
+                        global::Android.App.Application.Context.StartActivity(fallbackIntent);
+                    }
+                    catch
+                    {
+                        // Last resort: show path
+                        App.Notification?.Show(new Notification("下载路径", LocalPath, NotificationType.Information));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Notification?.Show(new Notification("下载路径", LocalPath, NotificationType.Information));
+            }
+            return;
 #else
             if (OperatingSystem.IsWindows())
             {

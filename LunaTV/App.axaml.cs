@@ -10,7 +10,9 @@ using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using LunaTV.Constants;
+using LunaTV.ViewModels;
 using LunaTV.Views;
+using Microsoft.Extensions.DependencyInjection;
 using N_m3u8DL_RE.Common.Util;
 using Ursa.Controls;
 
@@ -115,7 +117,23 @@ public class App : Application
             var win = new CrashWindow(e.Exception.ToString());
             win.Show();
 #else
-            System.Diagnostics.Trace.WriteLine($"[LunaTV] Unhandled UI exception: {e.Exception}");
+            System.Diagnostics.Trace.WriteLine($"[LunaTV Crash] {e.Exception}");
+            try
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    try
+                    {
+                        var mainVm = Services.GetService<MainViewModel>();
+                        if (mainVm != null)
+                        {
+                            mainVm.PageContent = new AndroidCrashView(e.Exception.ToString());
+                        }
+                    }
+                    catch { }
+                });
+            }
+            catch { }
 #endif
         }
         finally
@@ -135,7 +153,24 @@ public class App : Application
             var win = new CrashWindow(e.ToString() ?? "Unhandled Exception");
             win.Show();
 #else
-            System.Diagnostics.Trace.WriteLine($"[LunaTV] Unhandled domain exception: {e}");
+            var exMsg = e.ExceptionObject?.ToString() ?? "Unknown error";
+            System.Diagnostics.Trace.WriteLine($"[LunaTV Crash] {exMsg}");
+            try
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    try
+                    {
+                        var mainVm = Services.GetService<MainViewModel>();
+                        if (mainVm != null)
+                        {
+                            mainVm.PageContent = new AndroidCrashView(exMsg);
+                        }
+                    }
+                    catch { }
+                });
+            }
+            catch { }
 #endif
         }
         catch
